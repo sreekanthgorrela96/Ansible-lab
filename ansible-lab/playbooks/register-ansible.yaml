@@ -1,0 +1,11 @@
+#!/home/GSK/ansible-lab/inventory/venv/bin/python3
+- name: Register variables
+  hosts: all 
+  become: yes 
+  tasks: 
+  - name: Get the bash version 
+    shell: bash --version
+    register: bashver
+  - name: checking the version of bash 
+    debug: 
+      msg: "The version of bash is {{ bashver.stdout_lines[0] }}"

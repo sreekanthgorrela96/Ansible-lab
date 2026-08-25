@@ -1,0 +1,31 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/ec2
+- name: Launch EC2 instance from existing AMI
+  amazon.aws.ec2_instance:
+    name: "{{ instance_name }}"
+    image_id: "{{ ami_id }}"
+    instance_type: "{{ instance_type }}"
+    key_name: "{{ key_name }}"
+    vpc_subnet_id: "{{ subnet_id }}"
+    security_group: "{{ security_group_id }}"
+    region: "{{ aws_region }}"
+    wait: true
+    state: running
+    tags:
+      Name: "{{ instance_name }}"
+      CreatedBy: "Ansible"
+      SourceAMI: "{{ ami_id }}"
+  register: ec2_result
+
+- name: Display EC2 instance ID
+  ansible.builtin.debug:
+    msg: "EC2 Instance ID: {{ ec2_result.instances[0].instance_id }}"
+
+- name: Display EC2 private IP
+  ansible.builtin.debug:
+    msg: "Private IP: {{ ec2_result.instances[0].private_ip_address }}"
+
+- name: Display EC2 public IP
+  ansible.builtin.debug:
+    msg: "Public IP: {{ ec2_result.instances[0].public_ip_address }}"

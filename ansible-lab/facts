@@ -1,0 +1,18 @@
+---
+- name: Gather the host facts
+  hosts: all
+  gather_facts: yes
+  tasks:
+  - name: Display hostname
+    debug:
+      var: ansible_facts
+      msg: "Hostname: {{ ansible_facts.ansible_hostname }}"
+  - name: Display OS information
+    debug:
+      var: ansible_facts
+      msg: "Operating System: {{ ansible_facts.ansible_distribution }} {{ ansible_facts.ansible_distribution_version }}"
+  - name: Display network interfaces
+    debug:
+      var: ansible_facts
+      msg: "Network Interfaces: {{ ansible_facts.ansible_interfaces }}"
+

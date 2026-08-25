@@ -1,0 +1,27 @@
+#!/usr/bin/ansible-playbook
+- name: Demo playbook for ping
+  hosts: all
+  remote_user: sgorrela
+  become: yes
+  become_user: root
+  gather_facts: true
+
+  tasks:
+    - name: ping the hosts
+      ansible.builtin.ping:
+    - name: Installing packages
+      ansible.builtin.apt:
+        name: "{{ item}}"
+        state: absent
+      loop:
+        - git
+        - curl
+        - vim
+ 
+    - name: Checking the installed state
+      ansible.builtin.package_facts:
+        manager: auto
+    - name: Display installed packages
+      ansible.builtin.debug:
+        msg: "Git is installed"
+      when: "'git' in ansible_facts.packages"

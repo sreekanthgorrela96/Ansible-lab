@@ -1,0 +1,8 @@
+---
+- name: Create AWS Custom AMI
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - ami

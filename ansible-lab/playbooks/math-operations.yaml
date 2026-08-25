@@ -1,0 +1,28 @@
+#!/home/GSK/ansible-lab/inventory/venv/bin/python3
+- name: Displaying the arthmetic operations 
+  hosts: localhost
+  become: yes
+  gather_facts: false
+  vars:
+    num1: "10"
+    num2: "{{num1 + 10}}"
+
+  vars_prompt:
+    - name: x
+      prompt: "Enter the value of x"
+      private: false
+
+    - name: y
+      prompt: "Enter the value of y"
+      private: false
+
+  tasks:
+  - name: Addition 
+    debug:
+      msg:
+      - "Addition of user defined x, y is {{x + y}}"
+      - "Addition of user defined x, y is {{x|int + y|int}}"
+      - "Multiplication of user defined x, y is {{x|int * y|int}}"
+      - "Subtraction of user defined x, y is {{x|int - y|int}}"
+      - "Division of user defined x, y is {{x|int / y|int}}"
+

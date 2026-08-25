@@ -1,0 +1,17 @@
+---
+- name: Test AWS Collection
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+
+    - name: Get AWS account information
+      amazon.aws.aws_caller_info:
+      register: aws_info
+
+    - name: Display AWS account
+      ansible.builtin.debug:
+        msg:
+          - "AWS Account: {{ aws_info.account }}"
+          - "ARN: {{ aws_info.arn }}"

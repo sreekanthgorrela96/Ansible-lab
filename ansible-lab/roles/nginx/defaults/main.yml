@@ -1,0 +1,8 @@
+#SPDX-License-Identifier: MIT-0
+# defaults file for roles/nginx
+---
+nginx_package: nginx
+nginx_service: nginx
+web_root: /var/www/myapp
+app_name: "Ansible Demo Application"
+app_port: 80

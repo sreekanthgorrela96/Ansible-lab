@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  author: Sreekanth
+  description: Create an AWS AMI from an existing EC2 instance
+  company: OSI Digital
+  license: MIT
+  min_ansible_version: "2.15"
+
+  galaxy_tags:
+    - aws
+    - ec2
+    - ami
+    - infrastructure
+    - devops
+
+dependencies: []

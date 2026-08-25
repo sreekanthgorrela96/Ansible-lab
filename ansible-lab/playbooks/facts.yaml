@@ -1,0 +1,17 @@
+---
+- name: Facts Demo
+  hosts: all
+  gather_facts: yes
+
+  tasks:
+    - name: Display hostname
+      debug:
+        msg: "Hostname is {{ ansible_hostname }}"
+
+    - name: Display OS
+      debug:
+        msg: "Operating system is {{ ansible_distribution }}"
+
+    - name: Display IP
+      debug:
+        msg: "IP address is {{ ansible_default_ipv4.address }}"

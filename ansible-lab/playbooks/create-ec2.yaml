@@ -1,0 +1,8 @@
+---
+- name: Provision EC2 from Existing AMI
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - ec2

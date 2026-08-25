@@ -1,0 +1,20 @@
+- name: Show server information
+  hosts: all
+
+  tasks:
+
+    - name: Hostname
+      ansible.builtin.debug:
+        var: ansible_hostname
+
+    - name: OS
+      ansible.builtin.debug:
+        var: ansible_distribution
+
+    - name: IP address
+      ansible.builtin.debug:
+        var: ansible_default_ipv4.address
+
+    - name: Memory
+      ansible.builtin.debug:
+        var: ansible_memtotal_mb

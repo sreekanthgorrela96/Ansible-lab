@@ -1,0 +1,8 @@
+---
+environment: qa
+
+db_name: demoapp_qa
+db_user: appuser_qa
+
+backup_dir: /opt/mariadb-backups
+backup_file: demoapp_qa.sql

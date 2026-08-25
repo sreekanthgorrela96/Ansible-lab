@@ -1,0 +1,18 @@
+#!/home/GSK/ansible-lab/inventory/venv/bin/python3
+- name: Displaying the arthmetic operations 
+  hosts: localhost
+  become: yes
+  gather_facts: false
+  vars:
+    num1: 10
+    num2: 20
+  tasks:
+  - name: Addition 
+    debug:
+      msg:
+      - Value of num1 is {{num1}}
+      - Value of num2 is {{num2}}
+      - Addition of num1 and num2 is {{num1 + num2}}
+      - Substration of num1 and num2 is {{num1 - num2}}
+      - Multiplication of num1 and num2 is {{num1 * num2}}
+      - Division of num1 and num2 is {{num1 / num2}}

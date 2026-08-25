@@ -1,0 +1,18 @@
+---
+- name: Create AMI from existing EC2 instance
+  amazon.aws.ec2_ami:
+    instance_id: "{{ source_instance_id }}"
+    name: "{{ custom_ami_name }}"
+    description: "{{ custom_ami_description }}"
+    region: "{{ aws_region }}"
+    wait: true
+    state: present
+    tags:
+      Name: "{{ custom_ami_name }}"
+      CreatedBy: "Ansible"
+      SourceInstance: "{{ source_instance_id }}"
+  register: ami_result
+
+- name: Display created AMI ID
+  ansible.builtin.debug:
+    msg: "AMI created successfully: {{ ami_result.image_id }}"

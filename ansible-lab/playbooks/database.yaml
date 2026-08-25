@@ -1,0 +1,6 @@
+- name: Playbook to install the DB
+  hosts: db_servers
+  gather_facts: false
+    
+  roles:
+    - database

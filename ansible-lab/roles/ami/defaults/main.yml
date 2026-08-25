@@ -1,0 +1,21 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/ami
+aws_region: us-east-1
+
+# Existing AWS base AMI
+base_ami_id: "ami-004f790b835b26145"
+source_instance_id: "i-06f803f71a104eaf7"
+
+# Existing AWS resources
+#key_name: "Ansikey"
+#subnet_id: "subnet-044d0c7b42a3d0b89"
+#security_group_id: "sg-046bd9c6e2fd518e5"
+
+# Temporary builder
+#ami_builder_name: "ansible-ami-builder"
+#ami_builder_instance_type: "t3.micro"
+
+# New custom AMI
+custom_ami_name: "ansible-custom-ami"
+custom_ami_description: "AMI created from existing EC2 instance using Ansible"

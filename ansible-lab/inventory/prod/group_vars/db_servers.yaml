@@ -1,0 +1,8 @@
+---
+environment: prod
+
+db_name: demoapp
+db_user: appuser
+
+backup_dir: /opt/mariadb-backups
+backup_file: demoapp.sql

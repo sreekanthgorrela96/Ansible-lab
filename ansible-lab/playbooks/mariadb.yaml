@@ -1,0 +1,10 @@
+---
+- name: Configure MariaDB server
+  hosts: db_servers
+  become: true
+  gather_facts: true
+  vars_files:
+    - /home/GSK/ansible-lab/inventory/group_vars/vault.yml
+
+  roles:
+    - mariadb

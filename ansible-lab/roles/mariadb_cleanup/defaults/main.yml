@@ -1,0 +1,14 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/mariadb_cleanup
+db_name: demoapp
+db_user: appuser
+
+backup_dir: /opt/mariadb-backups
+backup_file: demoapp.sql
+
+mariadb_packages:
+  - mariadb-server
+  - python3-pymysql
+
+mariadb_service: mariadb

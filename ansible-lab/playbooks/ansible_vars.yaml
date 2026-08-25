@@ -1,0 +1,31 @@
+#!/home/GSK/ansible-lab/inventory/venv/bin/python3
+- name: ansible variables
+  hosts: all
+  become: yes
+  vars:
+    my_variable: "Hello, Ansible!"
+    another_variable: "This is another variable."
+    packages: [vim, curl, ufw, unzip]
+    cities:
+    - Istanbul
+    - New York
+    - London
+    - Tokyo
+    - Sydney
+    web_servers: {'linux': 'httpd', 'Unix': 'apache', 'Windows': 'IIS'}
+  tasks:
+  - name: Display my_variable
+    debug:
+      msg: "{{ my_variable }}"
+  - name: Display another_variable
+    debug:
+      msg: "{{ another_variable }}"
+  - name: Display the list of packages
+    debug:
+      msg: "{{ packages }}"
+  - name: Display the list of cities
+    debug:
+      msg: "{{ cities }}"
+  - name: Display web servers
+    debug:
+      msg: "{{ web_servers }}"

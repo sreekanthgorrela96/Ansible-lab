@@ -1,0 +1,17 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/ec2
+aws_region: us-east-1
+
+# Existing/custom AMI
+ami_id: "ami-031b081c5fd734277"
+
+instance_type: "t3.micro"
+
+instance_name: "ansible-demo-ec2"
+
+key_name: "Ansikey"
+
+subnet_id: "subnet-044d0c7b42a3d0b89"
+
+security_group_id: "sg-046bd9c6e2fd518e5"
