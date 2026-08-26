@@ -3,8 +3,10 @@
   hosts: db_servers
   become: true
   gather_facts: true
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   vars_files:
     - /home/GSK/ansible-lab/inventory/group_vars/vault.yml
 
   roles:
-    - mariadb
+    - role: "../../roles/mariadb"
