@@ -1,18 +1,19 @@
-#SPDX-License-Identifier: MIT-0
+# SPDX-License-Identifier: MIT-0
 ---
-# tasks file for roles/databse
+# tasks file for roles/database
 
-- name: Install MySQL
+- name: Install MySQL server
   ansible.builtin.apt:
     name: mysql-server
     state: present
+    update_cache: true
 
 - name: Install Python MySQL dependency
   ansible.builtin.apt:
     name: python3-pymysql
     state: present
 
-- name: Start MySQL
+- name: Ensure MySQL service is running and enabled
   ansible.builtin.service:
     name: mysql
     state: started
@@ -24,11 +25,11 @@
     state: present
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-- name: Create database user
+- name: Create database user and grant privileges
   community.mysql.mysql_user:
     name: "{{ db_user }}"
     password: "{{ db_password }}"
     priv: "{{ db_name }}.*:ALL"
-    host: localhost
+    host: "localhost"
     state: present
     login_unix_socket: /var/run/mysqld/mysqld.sock
