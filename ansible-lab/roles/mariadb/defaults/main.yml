@@ -7,6 +7,7 @@ mariadb_service: mariadb
 
 db_name: demoapp
 db_user: appuser
+db_password: "Security@1345"
 
 backup_dir: /opt/mariadb-backups
 backup_file: demoapp.sql
