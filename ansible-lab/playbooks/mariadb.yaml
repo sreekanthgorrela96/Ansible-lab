@@ -3,10 +3,10 @@
   hosts: db_servers
   become: true
   gather_facts: true
+  vars_files:
+    - "../../inventory/group_vars/vault.yml"   # Relative path from playbooks/ directory
   vars:
     ansible_python_interpreter: /usr/bin/python3
-  vars_files:
-    - /home/GSK/ansible-lab/inventory/group_vars/vault.yml
 
   roles:
     - role: "../../roles/mariadb"
