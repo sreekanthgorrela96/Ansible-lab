@@ -1,6 +1,6 @@
 
 [app_servers]
-k8s-worker1 ansible_host=192.168.34.236
+k8s-worker1 ansible_host=192.168.34.240
 
 [k8s-workers]
 k8s-worker1 ansible_host=192.168.34.236 ansible_user=sgorrela ansible_python_interpreter=/usr/bin/python3
