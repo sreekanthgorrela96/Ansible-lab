@@ -1,0 +1,17 @@
+---
+- name: Test Semaphore connectivity
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Test connectivity
+      ansible.builtin.ping:
+
+    - name: Show connected user
+      ansible.builtin.command: whoami
+      register: result
+      changed_when: false
+
+    - name: Display user
+      ansible.builtin.debug:
+        var: result.stdout
