@@ -3,4 +3,5 @@
 # defaults file for roles/databse
 db_name: demoapp
 db_user: appuser
+db_password: "Security@1345"
 
