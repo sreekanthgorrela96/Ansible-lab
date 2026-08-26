@@ -1,7 +1,7 @@
 ---
 - name: Test Semaphore connectivity
   hosts: all
-  gather_facts: true
+  gather_facts: false
 
   tasks:
     - name: Test connectivity
@@ -15,3 +15,7 @@
     - name: Display user
       ansible.builtin.debug:
         var: result.stdout
+
+    - name: Display host IP
+      ansible.builtin.debug:
+        msg: "Target host IP is {{ ansible_host | default(inventory_hostname) }}"
