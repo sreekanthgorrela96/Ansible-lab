@@ -1,0 +1,15 @@
+---
+- name: Test Vault
+  hosts: dbservers
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../inventory/group_vars/vault.yml"
+
+  tasks:
+    - name: Check that Vault variable exists
+      ansible.builtin.assert:
+        that:
+          - db_password is defined
+        fail_msg: "db_password was not loaded from Ansible Vault"
+        success_msg: "db_password successfully loaded from Ansible Vault"
