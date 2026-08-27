@@ -1,0 +1,16 @@
+---
+- name: Test AWS dynamic inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Test AWS API access
+      amazon.aws.aws_caller_info:
+      register: aws_info
+
+    - name: Show AWS account
+      ansible.builtin.debug:
+        msg:
+          - "AWS Account: {{ aws_info.account }}"
+          - "AWS ARN: {{ aws_info.arn }}"
