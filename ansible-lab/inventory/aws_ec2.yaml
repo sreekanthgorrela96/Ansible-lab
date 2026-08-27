@@ -1,20 +1,21 @@
+# inventory/aws_ec2.yaml
+
 plugin: amazon.aws.aws_ec2
+
 regions:
-  - us-east-1  # Change to your target region
+  - us-east-1
 
-# Option 1: Jinja2 Templating (Recommended)
-# Evaluates in order: uses public IP, falls back to private IP, then instance ID
+filters:
+  instance-state-name: running
+
 hostnames:
-  - ip-address           # Built-in dynamic plugin key
-  - "{{ public_ip_address | default(private_ip_address) }}"
-  - "{{ instance_id }}"
+  - ip-address
+  - private-ip-address
 
-# Ensure the connection target is mapped directly
 compose:
   ansible_host: public_ip_address | default(private_ip_address)
 
-# Create groups automatically based on tags
 keyed_groups:
-  - key: tags.Name
+  - key: ec2_tags.Name
     prefix: tag_Name
     separator: "_"
