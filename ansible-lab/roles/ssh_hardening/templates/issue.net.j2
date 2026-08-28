@@ -1,0 +1,26 @@
+{% if ssh_banner_custom_text != "" %}
+{{ ssh_banner_custom_text }}
+{% else %}
+===============================================================================
+                     {{ ssh_organization_name | upper }}
+             {{ ssh_organization_department | upper }}
+===============================================================================
+ CLASSIFICATION LEVEL: {{ ssh_system_classification }}
+ SECURITY CONTACT:     {{ ssh_security_contact_email }}
+ SYSTEM HOSTNAME:      {{ inventory_hostname }}
+ OPERATING SYSTEM:     {{ ansible_distribution }} {{ ansible_distribution_version }}
+===============================================================================
+
+ WARNING: AUTHORIZED ACCESS ONLY!
+
+ All activities on this system are logged, monitored, and recorded by Security
+ Operations. By accessing this system, you acknowledge and consent to active
+ monitoring and auditing of all commands and data transmissions.
+
+ Unauthorized access, misuse, or tampering with this computer system is strictly
+ prohibited and will be prosecuted under local and international laws.
+
+ IF YOU ARE NOT AN AUTHORIZED USER, DISCONNECT IMMEDIATELY.
+
+===============================================================================
+{% endif %}

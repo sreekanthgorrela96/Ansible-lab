@@ -1,0 +1,18 @@
+---
+- name: Apply sysctl kernel security hardening
+  ansible.builtin.include_tasks: sysctl.yml
+  when: os_hardening_enable_sysctl
+  tags:
+    - os_hardening
+
+- name: Apply security core dump limits hardening
+  ansible.builtin.include_tasks: limits.yml
+  when: os_hardening_enable_limits
+  tags:
+    - os_hardening
+
+- name: Apply critical file permissions hardening
+  ansible.builtin.include_tasks: permissions.yml
+  when: os_hardening_enable_permissions
+  tags:
+    - os_hardening

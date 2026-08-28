@@ -1,0 +1,10 @@
+---
+- name: Restrict core dumps in security limits
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/99-coredump-hardening.conf
+    content: |
+      * hard core 0
+      * soft core 0
+    owner: root
+    group: root
+    mode: '0644'

@@ -1,0 +1,4 @@
+---
+- name: Set SSH service name fact for RedHat family
+  ansible.builtin.set_fact:
+    ssh_service_name: "sshd"

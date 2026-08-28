@@ -1,0 +1,32 @@
+# Hardened OpenSSH Server Configuration - Managed by Ansible
+# Do not edit manually
+
+Port {{ ssh_port }}
+Protocol 2
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Security & Authentication Settings
+PermitRootLogin {{ ssh_permit_root_login }}
+PubkeyAuthentication {{ ssh_pubkey_authentication }}
+PasswordAuthentication {{ ssh_password_authentication }}
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+UsePAM yes
+X11Forwarding {{ ssh_x11_forwarding }}
+MaxAuthTries {{ ssh_max_auth_tries }}
+ClientAliveInterval {{ ssh_client_alive_interval }}
+ClientAliveCountMax {{ ssh_client_alive_count_max }}
+UseDNS {{ ssh_use_dns }}
+AllowTcpForwarding no
+AllowAgentForwarding no
+Banner {{ ssh_banner_path }}
+
+# Cryptographic Algorithms
+Ciphers {{ ssh_ciphers | join(',') }}
+KexAlgorithms {{ ssh_kex_algorithms | join(',') }}
+MACs {{ ssh_macs | join(',') }}
+
+Subsystem sftp internal-sftp

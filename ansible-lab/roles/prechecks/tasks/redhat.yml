@@ -1,0 +1,28 @@
+---
+- name: Check for DNF/YUM lock files on RedHat family
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ package_manager_lock_files | default(['/var/run/dnf.pid', '/var/run/yum.pid']) }}"
+  register: dnf_locks
+
+- name: Assert no DNF/YUM lock files active
+  ansible.builtin.assert:
+    that:
+      - not item.stat.exists
+    fail_msg: "CRITICAL: Package manager lock file {{ item.item }} exists. DNF/YUM process is running!"
+    success_msg: "No active package manager locks detected on {{ item.item }}"
+  loop: "{{ dnf_locks.results }}"
+
+- name: Check RPM database integrity
+  ansible.builtin.command:
+    cmd: "rpm -qa"
+  changed_when: false
+  register: rpm_check
+  failed_when: rpm_check.rc != 0
+
+- name: Assert RPM database accessible
+  ansible.builtin.assert:
+    that:
+      - rpm_check.rc == 0
+    fail_msg: "CRITICAL: RPM database is corrupted or inaccessible!"
+    success_msg: "RPM database healthy."

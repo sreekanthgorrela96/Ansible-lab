@@ -1,0 +1,11 @@
+---
+- name: Manage system groups
+  ansible.builtin.include_tasks: groups.yml
+  when: users_groups | length > 0
+  tags:
+    - users
+
+- name: Provision active and decommissioned user accounts
+  ansible.builtin.include_tasks: manage_users.yml
+  tags:
+    - users

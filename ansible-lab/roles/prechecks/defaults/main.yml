@@ -1,0 +1,7 @@
+precheck_require_clean_locks: true
+precheck_dns_test_host: "8.8.8.8"
+precheck_skip_icmp_ping: false
+precheck_autofix_dpkg: false
+maintenance_environment: "development"
+maintenance_approval_required: false
+maintenance_change_ticket: ""

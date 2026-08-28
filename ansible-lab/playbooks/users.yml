@@ -1,0 +1,10 @@
+---
+- name: Standalone User & Group Provisioning Playbook
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: common
+      tags: [common, Always]
+    - role: users
+      tags: [users]

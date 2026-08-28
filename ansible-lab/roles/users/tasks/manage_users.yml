@@ -1,0 +1,52 @@
+---
+- name: Create or update active user accounts
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    comment: "{{ item.comment | default(item.username) }}"
+    uid: "{{ item.uid | default(omit) }}"
+    groups: "{{ item.groups | default([]) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    password: "{{ item.password | default(omit) }}"
+    state: present
+    create_home: true
+  loop: "{{ users_present }}"
+  when: users_present | length > 0
+
+- name: Deploy SSH Authorized Keys for active users
+  ansible.posix.authorized_key:
+    user: "{{ item.username }}"
+    key: "{{ item.ssh_key }}"
+    state: present
+  loop: "{{ users_present }}"
+  when:
+    - users_present | length > 0
+    - item.ssh_key is defined
+    - item.ssh_key != ""
+
+- name: Deploy custom sudoer drop-in configuration for users with sudo rules
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/99-user-{{ item.username }}"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: '/usr/sbin/visudo -cf %s'
+  loop: "{{ users_present }}"
+  when:
+    - users_present | length > 0
+    - item.sudo_rule is defined
+
+- name: Remove or lock decommissioned user accounts
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    state: absent
+    remove: "{{ item.remove | default(false) }}"
+  loop: "{{ users_absent }}"
+  when: users_absent | length > 0
+
+- name: Remove sudoer rules for decommissioned users
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/99-user-{{ item.username }}"
+    state: absent
+  loop: "{{ users_absent }}"
+  when: users_absent | length > 0

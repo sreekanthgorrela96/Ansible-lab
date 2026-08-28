@@ -1,0 +1,6 @@
+# OS Security Hardening Kernel Parameters - Managed by Ansible
+# Path: /etc/sysctl.d/99-os-hardening.conf
+
+{% for key, value in sysctl_settings.items() %}
+{{ key }} = {{ value }}
+{% endfor %}

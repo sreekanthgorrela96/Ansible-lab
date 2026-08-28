@@ -1,0 +1,4 @@
+# Custom Sudoers Rule for {{ item.username }} - Managed by Ansible
+# Do not edit manually
+
+{{ item.username }} {{ item.sudo_rule | default('ALL=(ALL) NOPASSWD:ALL') }}

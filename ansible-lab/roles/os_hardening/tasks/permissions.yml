@@ -1,0 +1,13 @@
+---
+- name: Harden system critical file permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: root
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: '/etc/shadow', mode: '0600', group: 'shadow' }
+    - { path: '/etc/gshadow', mode: '0600', group: 'shadow' }
+    - { path: '/etc/passwd', mode: '0644' }
+    - { path: '/etc/group', mode: '0644' }
+  failed_when: false

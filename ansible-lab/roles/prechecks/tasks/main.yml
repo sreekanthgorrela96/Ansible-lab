@@ -1,0 +1,42 @@
+---
+- name: Validate production change approval requirement
+  ansible.builtin.assert:
+    that:
+      - not ((maintenance_environment | default('development')) == 'production' and (maintenance_approval_required | default(false)) and (maintenance_change_ticket | default('')) == '')
+    fail_msg: "CRITICAL: Maintenance approval ticket (maintenance_change_ticket) is required for production operations!"
+    success_msg: "Production safety approval check passed. Change Ticket: {{ maintenance_change_ticket | default('N/A') }}"
+  tags:
+    - precheck
+
+- name: Verify python availability and version
+  ansible.builtin.assert:
+    that:
+      - (ansible_python_version is defined and ansible_python_version is version('3.0.0', '>=')) or (ansible_python.version.major is defined and (ansible_python.version.major | int) >= 3)
+    fail_msg: "Python 3 is required for host maintenance."
+    success_msg: "Python {{ ansible_python_version | default(ansible_python.version.major | default(3)) }} confirmed."
+  tags:
+    - precheck
+
+- name: Verify outbound network connectivity via ICMP ping
+  ansible.builtin.command:
+    cmd: "ping -c 1 -W 3 {{ precheck_dns_test_host }}"
+  changed_when: false
+  failed_when: false
+  register: ping_test
+  when: not (precheck_skip_icmp_ping | default(false))
+  tags:
+    - precheck
+
+- name: Log warning if ICMP ping to reference host failed
+  ansible.builtin.debug:
+    msg: "WARNING: ICMP ping to {{ precheck_dns_test_host }} failed or was blocked by firewall. Proceeding with maintenance..."
+  when:
+    - not (precheck_skip_icmp_ping | default(false))
+    - ping_test.rc | default(0) != 0
+  tags:
+    - precheck
+
+- name: Dispatch OS family specific package manager lock prechecks
+  ansible.builtin.include_tasks: "{{ ansible_os_family | lower }}.yml"
+  tags:
+    - precheck

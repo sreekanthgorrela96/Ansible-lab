@@ -1,0 +1,56 @@
+---
+- name: Check for APT/DPKG lock files on Debian family
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ package_manager_lock_files | default(['/var/lib/dpkg/lock', '/var/lib/dpkg/lock-frontend']) }}"
+  register: apt_locks
+
+- name: Fail if package manager lock files exist and active process detected
+  ansible.builtin.shell:
+    cmd: "fuser {{ item.item }} 2>/dev/null"
+  loop: "{{ apt_locks.results }}"
+  when: item.stat.exists
+  changed_when: false
+  failed_when: false
+  register: lock_processes
+
+- name: Assert no package manager lock conflict
+  ansible.builtin.assert:
+    that:
+      - item.stdout == ""
+    fail_msg: "CRITICAL: Package manager lock {{ item.item.item }} is currently in use by process PID: {{ item.stdout }}!"
+    success_msg: "No active locks found on {{ item.item.item }}"
+  loop: "{{ lock_processes.results }}"
+  when: not item.skipped | default(false)
+
+- name: Check for pending dpkg interrupted state
+  ansible.builtin.command:
+    cmd: "dpkg --audit"
+  changed_when: false
+  register: dpkg_audit
+  failed_when: false
+
+- name: Attempt automatic DPKG repair if precheck_autofix_dpkg is enabled
+  ansible.builtin.command:
+    cmd: "dpkg --configure -a"
+  when:
+    - precheck_autofix_dpkg | default(false)
+    - dpkg_audit.stdout != ""
+  register: dpkg_repair
+
+- name: Re-audit DPKG state if repair was performed
+  ansible.builtin.command:
+    cmd: "dpkg --audit"
+  changed_when: false
+  register: dpkg_reaudit
+  when:
+    - precheck_autofix_dpkg | default(false)
+    - dpkg_repair.changed | default(false)
+  failed_when: false
+
+- name: Assert dpkg audit cleanliness
+  ansible.builtin.assert:
+    that:
+      - (dpkg_reaudit.stdout | default(dpkg_audit.stdout | default(''))) == ""
+    fail_msg: "CRITICAL: DPKG is in an interrupted/broken state! Output: {{ dpkg_reaudit.stdout | default(dpkg_audit.stdout | default('')) }}"
+    success_msg: "DPKG state clean."

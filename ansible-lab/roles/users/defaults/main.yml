@@ -1,0 +1,27 @@
+---
+# Declarative User Management Defaults
+
+# Supplementary user groups to manage/ensure present
+users_groups:
+  - sysadmins
+  - devops
+
+# List of active user accounts to provision
+# Example:
+# users_present:
+#   - username: sysadmin
+#     comment: System Administrator
+#     uid: 2001
+#     groups: ["sysadmins", "sudo", "wheel"]
+#     shell: /bin/bash
+#     password: "$6$rounds=656000$saltstring$hashedpassword"
+#     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... user@example.com"
+#     sudo_rule: "ALL=(ALL) NOPASSWD:ALL"
+users_present: []
+
+# List of decommissioned user accounts to purge or lock
+# Example:
+# users_absent:
+#   - username: formerdev
+#     remove: true  # True to purge home directory, False to just lock account
+users_absent: []
