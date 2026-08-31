@@ -1,0 +1,16 @@
+---
+- name: Test community.mysql
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Check mysql_db module
+      ansible.builtin.command:
+        cmd: ansible-doc community.mysql.mysql_db
+      register: result
+      changed_when: false
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: result.stdout_lines
