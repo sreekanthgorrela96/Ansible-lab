@@ -1,0 +1,8 @@
+---
+- name: Test Ansible role from AWX
+  hosts: linux_servers
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: mariadb
