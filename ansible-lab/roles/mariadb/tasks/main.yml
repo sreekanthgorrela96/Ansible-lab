@@ -22,7 +22,7 @@
     login_unix_socket: /run/mysqld/mysqld.sock
 
 - name: Create application database user
-  community.mysql.mysql_user:
+  ansible.mysql.mysql_user:
     name: "{{ db_user }}"
     password: "{{ db_password }}"
     priv: "{{ db_name }}.*:ALL"
@@ -39,7 +39,7 @@
     mode: "0755"
 
 - name: Create database backup
-  community.mysql.mysql_db:
+  ansible.mysql.mysql_db:
     name: "{{ db_name }}"
     state: dump
     target: "{{ backup_dir }}/{{ backup_file }}"
