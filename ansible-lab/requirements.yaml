@@ -1,5 +1,6 @@
 ---
 collections:
+  - name: community.mysql
   - name: ansible.mysql
   - name: amazon.aws
   - name: ansible.posix
