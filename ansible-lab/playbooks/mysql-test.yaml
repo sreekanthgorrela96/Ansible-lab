@@ -4,6 +4,6 @@
   gather_facts: false
   tasks:
     - name: Create test database
-      ansible.mysql.mysql_db:
+      community.mysql.mysql_db:
         name: awx_test
         state: present
