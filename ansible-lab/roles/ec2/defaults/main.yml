@@ -4,7 +4,7 @@
 aws_region: us-east-1
 
 # Existing/custom AMI
-ami_id: "ami-031b081c5fd734277"
+ami_id: "ami-045d7174eb0de5be9"
 
 instance_type: "t3.micro"
 
