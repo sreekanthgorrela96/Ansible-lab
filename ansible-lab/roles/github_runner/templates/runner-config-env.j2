@@ -1,0 +1,18 @@
+# GitHub Actions Runner Configuration Environment
+# This file is sourced by config.sh for registration
+# Contains sensitive data - keep permissions restricted (0600)
+
+# GitHub Personal Access Token (PAT)
+# Required scopes: repo, admin:org_hook, workflow
+GITHUB_TOKEN="{{ github_pat_token }}"
+
+# Runner configuration
+RUNNER_NAME="{{ runner_name }}"
+RUNNER_LABELS="{{ runner_labels | join(',') }}"
+RUNNER_WORK_DIR="{{ runner_work_dir }}/_work"
+RUNNER_GROUP="{{ runner_group }}"
+GITHUB_REPO_URL="{{ github_repo_url }}"
+
+# Optional: Runner tags for identification
+RUNNER_OWNER="{{ runner_owner | default('DevOps') }}"
+RUNNER_ENVIRONMENT="{{ runner_environment | default('production') }}"

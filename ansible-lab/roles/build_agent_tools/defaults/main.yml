@@ -1,0 +1,25 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Default variables for build_agent_tools role
+
+# Tool installation flags (enable/disable each tool)
+install_docker: true
+install_kubernetes_tools: true
+install_aws_cli: true
+install_build_tools: true
+
+# Runner user configuration
+runner_username: github-runner
+runner_home: /home/github-runner
+runner_work_dir: /home/github-runner/_work
+
+# Tool version specifications
+docker_version: "latest"
+kubectl_version: "v1.27.0"  # Update as needed
+helm_version: "v3.12.0"  # Installed via script, pinned on release
+maven_version: "3.9.2"  # Update as needed
+dotnet_version: "7.0"  # Update as needed
+nodejs_version: "v18.17.0"  # Update as needed
+
+# Package manager and installation method
+use_system_packages: false  # Set to true to prefer distro-provided packages (less control over versions)

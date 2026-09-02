@@ -1,0 +1,74 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Build Agent Tools Installation
+# Installs Docker, Kubernetes tools, AWS CLI, .NET, Maven, Node.js, and Python
+# Uses conditional includes, assertions, and fact-based logic for OS detection
+
+- name: Gather facts for tool installation
+  ansible.builtin.setup:
+  tags: [build_agent_tools, always]
+
+- name: Assert supported OS
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family in ['Debian', 'RedHat']
+      - ansible_distribution in ['Ubuntu', 'Debian', 'Amazon Linux']
+    fail_msg: |
+      This role requires Ubuntu, Debian, or Amazon Linux.
+      Detected: {{ ansible_distribution }} ({{ ansible_os_family }})
+  tags: [build_agent_tools, validation]
+
+- name: Display system information
+  ansible.builtin.debug:
+    msg: |
+      System Information:
+      OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      Kernel: {{ ansible_kernel }}
+      Python: {{ ansible_python_version }}
+      Available memory: {{ (ansible_memtotal_mb / 1024) | round(2) }} GB
+  tags: [build_agent_tools, info]
+
+- name: Set OS-specific variables
+  ansible.builtin.set_fact:
+    is_debian: "{{ ansible_os_family == 'Debian' }}"
+    is_rhel: "{{ ansible_os_family == 'RedHat' }}"
+    is_ubuntu: "{{ ansible_distribution == 'Ubuntu' }}"
+    is_amazon_linux: "{{ ansible_distribution == 'Amazon Linux' }}"
+  tags: [build_agent_tools, vars]
+
+- name: Include prerequisites setup
+  ansible.builtin.include_tasks: setup_prerequisites.yml
+  tags: [build_agent_tools, prerequisites]
+
+- name: Include Docker installation (conditional)
+  ansible.builtin.include_tasks: install_docker.yml
+  when: install_docker | default(true)
+  tags: [build_agent_tools, docker]
+
+- name: Include Kubernetes tools installation (conditional)
+  ansible.builtin.include_tasks: install_kubernetes_tools.yml
+  when: install_kubernetes_tools | default(true)
+  tags: [build_agent_tools, kubernetes]
+
+- name: Include AWS CLI installation (conditional)
+  ansible.builtin.include_tasks: install_aws_cli.yml
+  when: install_aws_cli | default(true)
+  tags: [build_agent_tools, aws]
+
+- name: Include build tools installation (conditional)
+  ansible.builtin.include_tasks: install_build_tools.yml
+  when: install_build_tools | default(true)
+  tags: [build_agent_tools, build-tools]
+
+- name: Display installation summary
+  ansible.builtin.debug:
+    msg: |
+      Build Agent Tools Installation Complete
+      ========================================
+      Docker: {{ 'Installed' if install_docker | default(true) else 'Skipped' }}
+      Kubernetes (kubectl, Helm): {{ 'Installed' if install_kubernetes_tools | default(true) else 'Skipped' }}
+      AWS CLI v2: {{ 'Installed' if install_aws_cli | default(true) else 'Skipped' }}
+      Build Tools (.NET, Maven, Node, Python): {{ 'Installed' if install_build_tools | default(true) else 'Skipped' }}
+      
+      Next step: Configure GitHub Actions runner with 'github_runner' role
+  tags: [build_agent_tools, summary]

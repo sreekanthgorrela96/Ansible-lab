@@ -1,0 +1,24 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Handlers for github_runner role
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  tags: [github_runner, handlers]
+
+- name: Start runner service
+  ansible.builtin.systemd:
+    name: github-runner
+    state: started
+    enabled: true
+  become: true
+  tags: [github_runner, handlers]
+
+- name: Restart runner service
+  ansible.builtin.systemd:
+    name: github-runner
+    state: restarted
+  become: true
+  tags: [github_runner, handlers]

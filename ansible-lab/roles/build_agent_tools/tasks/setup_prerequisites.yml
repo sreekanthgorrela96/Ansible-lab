@@ -1,0 +1,94 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Setup prerequisites and base packages
+
+- name: Update package manager cache (Debian)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+  when: is_debian
+  tags: [build_agent_tools, prerequisites]
+
+- name: Update package manager cache (RedHat)
+  ansible.builtin.yum:
+    update_cache: true
+  become: true
+  when: is_rhel
+  tags: [build_agent_tools, prerequisites]
+
+- name: Install prerequisite packages (Debian)
+  block:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - git
+          - curl
+          - unzip
+          - jq
+          - ca-certificates
+          - gpg
+          - lsb-release
+          - wget
+          - apt-transport-https
+          - gnupg2
+          - software-properties-common
+        state: present
+      become: true
+  rescue:
+    - name: Log prerequisite installation failure
+      ansible.builtin.debug:
+        msg: "Failed to install prerequisites on Debian system"
+  when: is_debian
+  tags: [build_agent_tools, prerequisites]
+
+- name: Install prerequisite packages (RedHat)
+  block:
+    - name: Install base packages
+      ansible.builtin.yum:
+        name:
+          - git
+          - curl
+          - unzip
+          - jq
+          - ca-certificates
+          - gnupg2
+          - wget
+          - yum-utils
+          - yum-cron
+        state: present
+      become: true
+  rescue:
+    - name: Log prerequisite installation failure
+      ansible.builtin.debug:
+        msg: "Failed to install prerequisites on RedHat system"
+  when: is_rhel
+  tags: [build_agent_tools, prerequisites]
+
+- name: Create runner user if not exists
+  ansible.builtin.user:
+    name: "{{ runner_username }}"
+    shell: /bin/bash
+    home: "{{ runner_home }}"
+    createhome: true
+    state: present
+  become: true
+  tags: [build_agent_tools, user]
+
+- name: Create runner working directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ runner_username }}"
+    group: "{{ runner_username }}"
+    mode: "0755"
+  become: true
+  loop:
+    - "{{ runner_home }}"
+    - "{{ runner_work_dir }}"
+  tags: [build_agent_tools, directories]
+
+- name: Display prerequisites installation status
+  ansible.builtin.debug:
+    msg: "Prerequisites installed successfully"
+  tags: [build_agent_tools, prerequisites]

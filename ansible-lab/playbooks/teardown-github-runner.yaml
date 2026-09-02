@@ -1,0 +1,220 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Actions Self-Hosted Runner Teardown Playbook
+# Gracefully deregisters runner from GitHub and terminates EC2 instance
+#
+# Usage:
+#   ansible-playbook playbooks/teardown-github-runner.yaml \
+#     -i inventory/hosts \
+#     -e "runner_instance_id=i-xxxxx" \
+#     -e "github_pat_token=ghp_xxxxx"
+
+- name: Teardown GitHub Actions Self-Hosted Runner
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  
+  vars:
+    aws_region: us-east-1
+    runner_instance_id: ""  # REQUIRED: Set via -e flag
+  
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - runner_instance_id | length > 0
+          - github_pat_token | length > 0
+        fail_msg: |
+          Missing required variables:
+          - runner_instance_id: EC2 instance ID to terminate (REQUIRED)
+          - github_pat_token: GitHub PAT token for deregistration (REQUIRED)
+          
+          Example:
+            ansible-playbook playbooks/teardown-github-runner.yaml \
+              -i inventory/hosts \
+              -e "runner_instance_id=i-xxxxxxxxx" \
+              -e "github_pat_token=ghp_xxxx"
+      tags: [always, validation]
+    
+    - name: Display teardown configuration
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Teardown Configuration:
+          ============================================
+          
+          Instance to Terminate:
+            ID: {{ runner_instance_id }}
+            Region: {{ aws_region }}
+          
+          This playbook will:
+          1. Query EC2 instance details
+          2. Connect to instance and deregister runner from GitHub
+          3. Stop runner systemd service
+          4. Delete runner from GitHub repository
+          5. Cleanup runner directory and user
+          6. Terminate EC2 instance
+          7. Delete associated security group
+          
+          WARNING: This will permanently delete the instance and runner.
+          No backups will be created.
+      tags: [always, summary]
+  
+  tasks:
+    - name: Get EC2 instance information
+      amazon.aws.ec2_instance_info:
+        instance_ids:
+          - "{{ runner_instance_id }}"
+        region: "{{ aws_region }}"
+      register: ec2_instances
+      tags: [ec2, info]
+    
+    - name: Validate instance exists
+      ansible.builtin.assert:
+        that:
+          - ec2_instances.instances | length > 0
+        fail_msg: |
+          EC2 instance not found: {{ runner_instance_id }}
+          
+          Verify:
+          - Instance ID is correct
+          - Instance exists in region: {{ aws_region }}
+          - You have permissions to describe EC2 instances
+      tags: [validation]
+    
+    - name: Extract instance details
+      ansible.builtin.set_fact:
+        instance_ip: "{{ ec2_instances.instances[0].public_ip_address | default(ec2_instances.instances[0].private_ip_address) }}"
+        instance_state: "{{ ec2_instances.instances[0].state.name }}"
+        instance_sg: "{{ ec2_instances.instances[0].security_groups[0].group_name }}"
+      tags: [info]
+    
+    - name: Add instance to dynamic inventory for deregistration
+      ansible.builtin.add_host:
+        name: "runner-for-teardown"
+        ansible_host: "{{ instance_ip }}"
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: "~/.ssh/default.pem"  # Adjust to your key
+        groups: deregister_runners
+      when: instance_state == 'running'
+      tags: [inventory]
+
+- name: Deregister GitHub Runner from Instance
+  hosts: deregister_runners
+  gather_facts: false
+  become: true
+  
+  tasks:
+    - name: Include GitHub runner deregistration task
+      ansible.builtin.include_tasks: roles/github_runner/tasks/deregister.yml
+      vars:
+        runner_work_dir: /home/github-runner/runner
+        runner_username: github-runner
+      ignore_errors: true
+      tags: [runner, deregister]
+
+- name: Terminate EC2 Instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  tasks:
+    - name: Display termination message
+      ansible.builtin.debug:
+        msg: |
+          Instance Information:
+          Instance ID: {{ runner_instance_id }}
+          Current State: {{ hostvars['localhost']['instance_state'] }}
+          Public IP: {{ hostvars['localhost']['instance_ip'] }}
+          Security Group: {{ hostvars['localhost']['instance_sg'] }}
+          
+          Proceeding with instance termination...
+      tags: [summary]
+    
+    - name: Terminate EC2 instance
+      amazon.aws.ec2_instance:
+        instance_ids:
+          - "{{ runner_instance_id }}"
+        region: "{{ aws_region }}"
+        state: terminated
+      register: terminate_result
+      tags: [ec2, termination]
+    
+    - name: Wait for instance to be terminated
+      amazon.aws.ec2_instance_info:
+        instance_ids:
+          - "{{ runner_instance_id }}"
+        region: "{{ aws_region }}"
+      register: instance_status
+      until: instance_status.instances[0].state.name == 'terminated'
+      retries: 30
+      delay: 10
+      tags: [ec2, termination]
+    
+    - name: Delete security group
+      amazon.aws.ec2_group:
+        name: "{{ hostvars['localhost']['instance_sg'] }}"
+        region: "{{ aws_region }}"
+        state: absent
+      ignore_errors: true
+      tags: [ec2, security-group]
+    
+    - name: Display teardown complete
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Teardown Complete!
+          ========================================
+          
+          Completed Actions:
+          ✓ Deregistered runner from GitHub
+          ✓ Stopped runner systemd service
+          ✓ Removed runner directory and user from instance
+          ✓ Terminated EC2 instance: {{ runner_instance_id }}
+          ✓ Deleted security group: {{ hostvars['localhost']['instance_sg'] }}
+          
+          Post-Cleanup Verification:
+          1. Verify runner is gone from GitHub:
+             - Navigate to: Settings > Actions > Runners
+             - Runner should no longer appear
+          
+          2. Verify instance is terminated:
+             - AWS EC2 Console > Instances
+             - Instance should show "terminated" state
+          
+          3. Cleanup local SSH keys (optional):
+             - rm ~/.ssh/{{ runner_instance_id }}.pem
+          
+          NOTE: AWS will retain terminated instances in console for ~1 hour.
+      tags: [summary]
+
+- name: Error Handling
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  tasks:
+    - name: Handle teardown failure
+      block:
+        - name: Display failure message
+          ansible.builtin.debug:
+            msg: |
+              Teardown encountered errors. Review messages above.
+              
+              Troubleshooting:
+              1. Verify instance ID is correct
+              2. Check AWS credentials and permissions
+              3. Verify runner can be SSH'd into
+              4. Check GitHub PAT token is valid
+              
+              Manual Cleanup Steps:
+              1. Deregister runner from GitHub:
+                 Settings > Actions > Runners > Delete
+              2. Terminate EC2 instance:
+                 AWS Console > EC2 > Instances > Terminate
+              3. Delete security group:
+                 AWS Console > VPC > Security Groups > Delete
+              4. Delete GitHub runner from API (if needed):
+                 curl -X DELETE \
+                   -H "Authorization: token <PAT>" \
+                   https://api.github.com/repos/<org>/<repo>/actions/runners/<runner_id>
+      when: ansible_failed_result is defined
+      tags: [error, cleanup]

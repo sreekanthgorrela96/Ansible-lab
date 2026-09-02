@@ -1,0 +1,118 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Docker CE installation with block/rescue/always pattern
+
+- name: Install Docker CE (Debian)
+  block:
+    - name: Add Docker repository GPG key
+      ansible.builtin.shell: |
+        curl -fsSL https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      become: true
+      changed_when: false
+      tags: [build_agent_tools, docker]
+
+    - name: Add Docker repository (Debian)
+      ansible.builtin.shell: |
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      become: true
+      changed_when: false
+      tags: [build_agent_tools, docker]
+
+    - name: Update apt cache after Docker repo addition
+      ansible.builtin.apt:
+        update_cache: true
+      become: true
+      tags: [build_agent_tools, docker]
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+      become: true
+      tags: [build_agent_tools, docker]
+
+  rescue:
+    - name: Log Docker installation failure (Debian)
+      ansible.builtin.debug:
+        msg: "Docker installation failed on Debian/Ubuntu. Continuing with other tools."
+      tags: [build_agent_tools, docker]
+
+  when: is_debian
+  tags: [build_agent_tools, docker]
+
+- name: Install Docker CE (RedHat/Amazon Linux)
+  block:
+    - name: Add Docker repository (RedHat)
+      ansible.builtin.shell: |
+        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      become: true
+      changed_when: false
+      tags: [build_agent_tools, docker]
+
+    - name: Install Docker packages (RedHat)
+      ansible.builtin.yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+      become: true
+      tags: [build_agent_tools, docker]
+
+  rescue:
+    - name: Log Docker installation failure (RedHat)
+      ansible.builtin.debug:
+        msg: "Docker installation failed on RedHat/Amazon Linux. Continuing with other tools."
+      tags: [build_agent_tools, docker]
+
+  when: is_rhel
+  tags: [build_agent_tools, docker]
+
+- name: Configure Docker for runner user
+  block:
+    - name: Add runner user to docker group
+      ansible.builtin.user:
+        name: "{{ runner_username }}"
+        groups: docker
+        append: true
+      become: true
+      tags: [build_agent_tools, docker]
+
+    - name: Enable Docker daemon on boot
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+      become: true
+      tags: [build_agent_tools, docker]
+
+    - name: Validate Docker installation
+      ansible.builtin.shell: |
+        docker --version
+      register: docker_version
+      changed_when: false
+      tags: [build_agent_tools, docker]
+
+    - name: Display Docker version
+      ansible.builtin.debug:
+        msg: "{{ docker_version.stdout }}"
+      tags: [build_agent_tools, docker]
+
+  rescue:
+    - name: Log Docker configuration failure
+      ansible.builtin.debug:
+        msg: "Docker configuration failed. Please verify manually."
+      tags: [build_agent_tools, docker]
+
+  always:
+    - name: Notify Docker daemon reload if needed
+      ansible.builtin.debug:
+        msg: "Docker configuration complete"
+      tags: [build_agent_tools, docker]
+
+  tags: [build_agent_tools, docker]

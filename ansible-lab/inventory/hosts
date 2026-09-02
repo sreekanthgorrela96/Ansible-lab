@@ -12,3 +12,8 @@ k8s-worker1 ansible_host=192.168.34.236
 [app_servers:vars]
 ansible_user=sgorrela
 ansible_ssh_private_key_file=~/.ssh/ansible_sgorrela
+
+# GitHub Actions Self-Hosted Runners (dynamically created by provision-github-runner.yaml)
+[github_runners]
+# Example: Add hosts here after provisioning or use dynamic inventory
+# github-runner-prod ansible_host=203.0.113.1 ansible_user=ubuntu

@@ -1,0 +1,43 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Runners Group Configuration
+# Used by provision-github-runner.yaml and teardown-github-runner.yaml
+
+# Runner configuration defaults for all runners in this group
+runner_username: github-runner
+runner_home: /home/github-runner
+runner_work_dir: /home/github-runner/runner
+
+# GitHub configuration (REQUIRED at runtime - provide via vault or -e flag)
+# github_pat_token: "{{ vault_github_pat_token }}"  # From vault (encrypted)
+# github_repo_url: "https://github.com/myorg/myrepo"  # From command line or inventory
+
+# Runner labels (customize per environment)
+runner_labels:
+  - self-hosted
+  - linux
+  - x64
+  - docker
+  - aws
+  - python
+  - dotnet
+  - node
+
+# AWS EC2 Configuration for runners
+aws_region: us-east-1
+instance_type: t3.medium
+environment: production
+owner: DevOps
+
+# Build tools installation flags
+install_docker: true
+install_kubernetes_tools: true
+install_aws_cli: true
+install_build_tools: true
+
+# Tool versions (can be overridden per runner if needed)
+kubectl_version: v1.27.0
+helm_version: v3.12.0
+maven_version: 3.9.2
+dotnet_version: 7.0
+nodejs_version: v18.17.0
