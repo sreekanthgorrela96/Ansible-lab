@@ -1,0 +1,72 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Kubernetes tools (kubectl, Helm) installation with block/rescue/always
+
+- name: Install kubectl
+  block:
+    - name: Download kubectl binary
+      ansible.builtin.shell: |
+        curl -fsSL https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl
+      become: true
+      tags: [build_agent_tools, kubernetes]
+
+    - name: Make kubectl executable
+      ansible.builtin.file:
+        path: /usr/local/bin/kubectl
+        mode: "0755"
+      become: true
+      tags: [build_agent_tools, kubernetes]
+
+    - name: Validate kubectl installation
+      ansible.builtin.shell: |
+        kubectl version --client
+      register: kubectl_version_output
+      changed_when: false
+      tags: [build_agent_tools, kubernetes]
+
+    - name: Display kubectl version
+      ansible.builtin.debug:
+        msg: "{{ kubectl_version_output.stdout }}"
+      tags: [build_agent_tools, kubernetes]
+
+  rescue:
+    - name: Log kubectl installation failure
+      ansible.builtin.debug:
+        msg: "kubectl installation failed. Continuing with other tools."
+      tags: [build_agent_tools, kubernetes]
+
+  tags: [build_agent_tools, kubernetes]
+
+- name: Install Helm
+  block:
+    - name: Download Helm script
+      ansible.builtin.shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      become: true
+      tags: [build_agent_tools, kubernetes]
+
+    - name: Validate Helm installation
+      ansible.builtin.shell: |
+        helm version
+      register: helm_version_output
+      changed_when: false
+      tags: [build_agent_tools, kubernetes]
+
+    - name: Display Helm version
+      ansible.builtin.debug:
+        msg: "{{ helm_version_output.stdout }}"
+      tags: [build_agent_tools, kubernetes]
+
+  rescue:
+    - name: Log Helm installation failure
+      ansible.builtin.debug:
+        msg: "Helm installation failed. Continuing with other tools."
+      tags: [build_agent_tools, kubernetes]
+
+  always:
+    - name: Kubernetes tools summary
+      ansible.builtin.debug:
+        msg: "Kubernetes tools installation complete"
+      tags: [build_agent_tools, kubernetes]
+
+  tags: [build_agent_tools, kubernetes]

@@ -1,0 +1,176 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Actions Runner Registration and Configuration
+# Downloads runner, registers with GitHub API (PAT protected with no_log), and configures systemd service
+
+- name: GitHub Actions Runner Setup
+  block:
+    - name: Check if runner already configured
+      ansible.builtin.stat:
+        path: "{{ runner_work_dir }}/runner-config"
+      register: runner_config_stat
+      tags: [github_runner, idempotency]
+
+    - name: Download GitHub Actions Runner
+      block:
+        - name: Get latest runner release
+          ansible.builtin.uri:
+            url: "{{ runner_releases_url }}"
+            return_content: true
+          register: runner_releases
+          tags: [github_runner, download]
+
+        - name: Extract runner download URL
+          ansible.builtin.set_fact:
+            runner_download_url: "{{ (runner_releases.json[0].assets | selectattr('name', 'match', '^actions-runner-linux-x64-.+\\.tar\\.gz$') | first).browser_download_url }}"
+            runner_version: "{{ runner_releases.json[0].tag_name }}"
+          tags: [github_runner, download]
+
+        - name: Download runner tarball
+          ansible.builtin.get_url:
+            url: "{{ runner_download_url }}"
+            dest: "/tmp/runner.tar.gz"
+            mode: "0755"
+          tags: [github_runner, download]
+
+        - name: Create runner directory
+          ansible.builtin.file:
+            path: "{{ runner_work_dir }}"
+            state: directory
+            owner: "{{ runner_username }}"
+            group: "{{ runner_username }}"
+            mode: "0755"
+          become: true
+          tags: [github_runner, download]
+
+        - name: Extract runner tarball
+          ansible.builtin.unarchive:
+            src: /tmp/runner.tar.gz
+            dest: "{{ runner_work_dir }}"
+            remote_src: true
+            owner: "{{ runner_username }}"
+            group: "{{ runner_username }}"
+          become: true
+          tags: [github_runner, download]
+
+        - name: Remove temporary runner tarball
+          ansible.builtin.file:
+            path: /tmp/runner.tar.gz
+            state: absent
+          tags: [github_runner, download]
+
+      when: not runner_config_stat.stat.exists
+      tags: [github_runner, download]
+
+    - name: Register runner with GitHub
+      block:
+        - name: Create runner configuration environment file
+          ansible.builtin.template:
+            src: runner-config-env.j2
+            dest: "{{ runner_work_dir }}/.env"
+            owner: "{{ runner_username }}"
+            group: "{{ runner_username }}"
+            mode: "0600"
+          become: true
+          no_log: true
+          tags: [github_runner, registration]
+
+        - name: Run configuration script
+          ansible.builtin.shell: |
+            cd {{ runner_work_dir }}
+            source .env
+            ./config.sh --url "{{ github_repo_url }}" \
+              --token "{{ github_pat_token }}" \
+              --name "{{ runner_name }}" \
+              --labels "{{ runner_labels | join(',') }}" \
+              --work "{{ runner_work_dir }}/_work" \
+              --runnergroup "{{ runner_group }}" \
+              --unattended
+          become: true
+          become_user: "{{ runner_username }}"
+          no_log: true
+          register: runner_config_result
+          tags: [github_runner, registration]
+
+        - name: Mark runner as configured
+          ansible.builtin.file:
+            path: "{{ runner_work_dir }}/runner-config"
+            state: touch
+            owner: "{{ runner_username }}"
+            group: "{{ runner_username }}"
+          become: true
+          tags: [github_runner, registration]
+
+      when: not runner_config_stat.stat.exists
+      tags: [github_runner, registration]
+
+    - name: Create systemd service file
+      ansible.builtin.template:
+        src: github-runner.service.j2
+        dest: /etc/systemd/system/github-runner.service
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      notify: Reload systemd daemon
+      tags: [github_runner, service]
+
+    - name: Enable and start runner service
+      ansible.builtin.systemd:
+        name: github-runner
+        enabled: true
+        state: started
+        daemon_reload: true
+      become: true
+      notify: Start runner service
+      tags: [github_runner, service]
+
+    - name: Verify runner service is running
+      ansible.builtin.systemd:
+        name: github-runner
+        state: started
+      become: true
+      register: runner_service_status
+      tags: [github_runner, validation]
+
+  rescue:
+    - name: Log runner setup failure
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner setup failed.
+          Error: {{ ansible_failed_result.msg | default('Unknown error') }}
+          
+          Troubleshooting:
+          1. Verify GitHub PAT token is valid and has required scopes
+          2. Verify repository URL is correct: {{ github_repo_url }}
+          3. Check runner name is unique: {{ runner_name }}
+          4. Verify network connectivity to github.com
+          5. Check runner work directory permissions: {{ runner_work_dir }}
+      no_log: false
+      tags: [github_runner, error]
+
+    - name: Fail with clear error message
+      ansible.builtin.fail:
+        msg: |
+          GitHub Actions Runner registration failed.
+          See debug output above for troubleshooting steps.
+      tags: [github_runner, error]
+
+  always:
+    - name: Display runner setup summary
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Setup Summary:
+          ====================================
+          Runner Name: {{ runner_name }}
+          Runner Version: {{ runner_version | default('Unknown') }}
+          Repository: {{ github_repo_url }}
+          Labels: {{ runner_labels | join(', ') }}
+          Service Status: {{ runner_service_status.status.ActiveState | default('Unknown') }}
+          Working Directory: {{ runner_work_dir }}
+          
+          Next steps:
+          1. Verify runner appears in GitHub repository: Settings > Actions > Runners
+          2. Run a test workflow targeting label: self-hosted
+          3. Monitor logs: journalctl -u github-runner -f
+      tags: [github_runner, summary]

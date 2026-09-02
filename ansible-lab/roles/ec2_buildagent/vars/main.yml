@@ -1,0 +1,14 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Role-specific variables for EC2 Build Agent (high priority, not easily overridden)
+
+# Internal polling and retry configuration
+ec2_polling_interval: 15
+ec2_max_retries: 20
+ssh_wait_timeout: 300
+ssh_wait_delay: 10
+
+# Common tags applied to all resources
+base_tags:
+  CreatedBy: "Ansible"
+  CreatedDate: "{{ ansible_date_time.iso8601 }}"

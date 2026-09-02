@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  author: "Ansible Lab"
+  description: "Register GitHub Actions self-hosted runner with GitHub API"
+  license: "MIT-0"
+  min_ansible_version: 2.9
+  galaxy_tags:
+    - ci-cd
+    - github-actions
+    - github
+    - runner
+    - registration
+
+dependencies: []

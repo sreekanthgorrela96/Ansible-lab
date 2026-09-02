@@ -1,0 +1,237 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Build tools installation (.NET SDK, Maven, Node.js, Python)
+
+- name: Install .NET SDK (Debian)
+  block:
+    - name: Add Microsoft .NET package repository (Debian)
+      ansible.builtin.shell: |
+        wget https://packages.microsoft.com/config/ubuntu/{{ ansible_distribution_version }}/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+        dpkg -i packages-microsoft-prod.deb
+        rm packages-microsoft-prod.deb
+      become: true
+      tags: [build_agent_tools, dotnet]
+
+    - name: Install .NET SDK (Debian)
+      ansible.builtin.apt:
+        name: "dotnet-sdk-{{ dotnet_version }}"
+        state: present
+      become: true
+      tags: [build_agent_tools, dotnet]
+
+  rescue:
+    - name: Log .NET SDK installation failure (Debian)
+      ansible.builtin.debug:
+        msg: ".NET SDK installation failed on Debian. Continuing with other tools."
+      tags: [build_agent_tools, dotnet]
+
+  when: is_debian
+  tags: [build_agent_tools, dotnet]
+
+- name: Install .NET SDK (RedHat)
+  block:
+    - name: Install .NET SDK (RedHat)
+      ansible.builtin.yum:
+        name: "dotnet-sdk-{{ dotnet_version }}"
+        state: present
+      become: true
+      tags: [build_agent_tools, dotnet]
+
+  rescue:
+    - name: Log .NET SDK installation failure (RedHat)
+      ansible.builtin.debug:
+        msg: ".NET SDK installation failed on RedHat. Continuing with other tools."
+      tags: [build_agent_tools, dotnet]
+
+  when: is_rhel
+  tags: [build_agent_tools, dotnet]
+
+- name: Validate .NET SDK installation
+  ansible.builtin.shell: |
+    dotnet --version
+  register: dotnet_version_output
+  changed_when: false
+  ignore_errors: true
+  tags: [build_agent_tools, dotnet]
+
+- name: Display .NET version
+  ansible.builtin.debug:
+    msg: "{{ dotnet_version_output.stdout }}"
+  when: dotnet_version_output.rc == 0
+  tags: [build_agent_tools, dotnet]
+
+- name: Install Java and Maven
+  block:
+    - name: Install Java (Debian)
+      ansible.builtin.apt:
+        name:
+          - openjdk-11-jdk
+          - openjdk-11-jdk-headless
+        state: present
+      become: true
+      when: is_debian
+      tags: [build_agent_tools, maven]
+
+    - name: Install Java (RedHat)
+      ansible.builtin.yum:
+        name:
+          - java-11-openjdk
+          - java-11-openjdk-devel
+        state: present
+      become: true
+      when: is_rhel
+      tags: [build_agent_tools, maven]
+
+    - name: Download Maven
+      ansible.builtin.shell: |
+        curl -fsSL https://archive.apache.org/dist/maven/maven-3/{{ maven_version }}/binaries/apache-maven-{{ maven_version }}-bin.tar.gz -o /tmp/maven.tar.gz
+      tags: [build_agent_tools, maven]
+
+    - name: Extract Maven
+      ansible.builtin.unarchive:
+        src: /tmp/maven.tar.gz
+        dest: /opt
+        remote_src: true
+      become: true
+      tags: [build_agent_tools, maven]
+
+    - name: Create Maven symlink
+      ansible.builtin.file:
+        src: "/opt/apache-maven-{{ maven_version }}"
+        dest: /opt/maven
+        state: link
+      become: true
+      tags: [build_agent_tools, maven]
+
+    - name: Add Maven to PATH
+      ansible.builtin.lineinfile:
+        path: /etc/profile.d/maven.sh
+        line: "export PATH=/opt/maven/bin:$PATH"
+        create: true
+      become: true
+      tags: [build_agent_tools, maven]
+
+    - name: Clean up Maven temporary files
+      ansible.builtin.file:
+        path: /tmp/maven.tar.gz
+        state: absent
+      tags: [build_agent_tools, maven]
+
+    - name: Validate Maven installation
+      ansible.builtin.shell: |
+        source /etc/profile.d/maven.sh && mvn --version
+      register: maven_version_output
+      changed_when: false
+      tags: [build_agent_tools, maven]
+
+    - name: Display Maven version
+      ansible.builtin.debug:
+        msg: "{{ maven_version_output.stdout }}"
+      tags: [build_agent_tools, maven]
+
+  rescue:
+    - name: Log Maven installation failure
+      ansible.builtin.debug:
+        msg: "Maven installation failed. Continuing with other tools."
+      tags: [build_agent_tools, maven]
+
+  tags: [build_agent_tools, maven]
+
+- name: Install Node.js
+  block:
+    - name: Download Node.js
+      ansible.builtin.shell: |
+        curl -fsSL https://nodejs.org/dist/{{ nodejs_version }}/node-{{ nodejs_version }}-linux-x64.tar.xz -o /tmp/node.tar.xz
+      tags: [build_agent_tools, nodejs]
+
+    - name: Extract Node.js
+      ansible.builtin.unarchive:
+        src: /tmp/node.tar.xz
+        dest: /usr/local
+        remote_src: true
+      become: true
+      tags: [build_agent_tools, nodejs]
+
+    - name: Create Node.js symlinks
+      ansible.builtin.shell: |
+        ln -sf /usr/local/node-{{ nodejs_version }}-linux-x64/bin/node /usr/local/bin/node
+        ln -sf /usr/local/node-{{ nodejs_version }}-linux-x64/bin/npm /usr/local/bin/npm
+        ln -sf /usr/local/node-{{ nodejs_version }}-linux-x64/bin/npx /usr/local/bin/npx
+      become: true
+      ignore_errors: true
+      tags: [build_agent_tools, nodejs]
+
+    - name: Clean up Node.js temporary files
+      ansible.builtin.file:
+        path: /tmp/node.tar.xz
+        state: absent
+      tags: [build_agent_tools, nodejs]
+
+    - name: Validate Node.js installation
+      ansible.builtin.shell: |
+        node --version && npm --version
+      register: node_version_output
+      changed_when: false
+      tags: [build_agent_tools, nodejs]
+
+    - name: Display Node.js version
+      ansible.builtin.debug:
+        msg: "{{ node_version_output.stdout }}"
+      tags: [build_agent_tools, nodejs]
+
+  rescue:
+    - name: Log Node.js installation failure
+      ansible.builtin.debug:
+        msg: "Node.js installation failed. Continuing with other tools."
+      tags: [build_agent_tools, nodejs]
+
+  tags: [build_agent_tools, nodejs]
+
+- name: Install Python 3 and pip
+  block:
+    - name: Install Python (Debian)
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+        state: present
+      become: true
+      when: is_debian
+      tags: [build_agent_tools, python]
+
+    - name: Install Python (RedHat)
+      ansible.builtin.yum:
+        name:
+          - python3
+          - python3-pip
+        state: present
+      become: true
+      when: is_rhel
+      tags: [build_agent_tools, python]
+
+    - name: Upgrade pip
+      ansible.builtin.shell: |
+        python3 -m pip install --upgrade pip
+      become: true
+      tags: [build_agent_tools, python]
+
+    - name: Validate Python installation
+      ansible.builtin.shell: |
+        python3 --version && pip3 --version
+      register: python_version_output
+      changed_when: false
+      tags: [build_agent_tools, python]
+
+    - name: Display Python version
+      ansible.builtin.debug:
+        msg: "{{ python_version_output.stdout }}"
+      tags: [build_agent_tools, python]
+
+  rescue:
+    - name: Log Python installation failure
+      ansible.builtin.debug:
+        msg: "Python installation failed. Continuing with other tools."
+      tags: [build_agent_tools, python]
+
+  tags: [build_agent_tools, python]

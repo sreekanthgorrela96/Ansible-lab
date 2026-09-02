@@ -1,0 +1,69 @@
+---
+# SPDX-License-Identifier: MIT-0
+# AWS CLI v2 installation with block/rescue/always
+
+- name: Install AWS CLI v2
+  block:
+    - name: Check if AWS CLI v2 already installed
+      ansible.builtin.shell: |
+        aws --version 2>&1 | grep -o "aws-cli/2" || echo "not-found"
+      register: aws_cli_check
+      changed_when: false
+      tags: [build_agent_tools, aws]
+
+    - name: Download AWS CLI v2 bundle
+      ansible.builtin.shell: |
+        cd /tmp && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      when: "'not-found' in aws_cli_check.stdout"
+      tags: [build_agent_tools, aws]
+
+    - name: Extract AWS CLI v2 bundle
+      ansible.builtin.unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp
+        remote_src: true
+      when: "'not-found' in aws_cli_check.stdout"
+      tags: [build_agent_tools, aws]
+
+    - name: Install AWS CLI v2
+      ansible.builtin.shell: |
+        /tmp/aws/install --update
+      become: true
+      when: "'not-found' in aws_cli_check.stdout"
+      tags: [build_agent_tools, aws]
+
+    - name: Clean up temporary AWS CLI files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      become: true
+      loop:
+        - /tmp/awscliv2.zip
+        - /tmp/aws
+      tags: [build_agent_tools, aws]
+
+    - name: Validate AWS CLI installation
+      ansible.builtin.shell: |
+        aws --version
+      register: aws_cli_version
+      changed_when: false
+      tags: [build_agent_tools, aws]
+
+    - name: Display AWS CLI version
+      ansible.builtin.debug:
+        msg: "{{ aws_cli_version.stdout }}"
+      tags: [build_agent_tools, aws]
+
+  rescue:
+    - name: Log AWS CLI installation failure
+      ansible.builtin.debug:
+        msg: "AWS CLI v2 installation failed. Continuing with other tools."
+      tags: [build_agent_tools, aws]
+
+  always:
+    - name: AWS CLI installation summary
+      ansible.builtin.debug:
+        msg: "AWS CLI installation complete"
+      tags: [build_agent_tools, aws]
+
+  tags: [build_agent_tools, aws]

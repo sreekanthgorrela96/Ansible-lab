@@ -1,0 +1,78 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Actions Runner Sensitive Credentials - ENCRYPTED VAULT
+# 
+# This file stores sensitive data encrypted with ansible-vault.
+# 
+# SETUP INSTRUCTIONS:
+# ===================
+# 1. Create this file with vault encryption:
+#    ansible-vault create inventory/group_vars/github_runners/vault.yml
+#
+# 2. Add GitHub PAT token (with repo + admin:org_hook scopes):
+#vault_github_pat_token: ""
+#
+# 3. Add repository URL:
+#    vault_github_repo_url: "https://github.com/myorg/myrepo"
+#
+# 4. Save and exit editor (Ctrl+D)
+#
+# 5. Verify encryption:
+#    cat inventory/group_vars/github_runners/vault.yml  # Should show encrypted content
+#
+# USAGE IN PLAYBOOKS:
+# ===================
+# Reference in playbook:
+#   vars:
+#     github_pat_token: "{{ vault_github_pat_token }}"
+#     github_repo_url: "{{ vault_github_repo_url }}"
+#
+# Run playbook with vault password:
+#   ansible-playbook playbooks/provision-github-runner.yaml \
+#     --vault-password-file=.vault_pass \
+#     -i inventory/hosts
+#
+# Or prompt for vault password:
+#   ansible-playbook playbooks/provision-github-runner.yaml \
+#     --ask-vault-pass \
+#     -i inventory/hosts
+#
+# VAULT PASSWORD STORAGE:
+# =======================
+# Option 1: Create .vault_pass file (add to .gitignore):
+#   echo "my-secure-vault-password" > .vault_pass
+#   chmod 600 .vault_pass
+#   ansible-playbook playbooks/provision-github-runner.yaml \
+#     --vault-password-file=.vault_pass
+#
+# Option 2: Use environment variable:
+#   export ANSIBLE_VAULT_PASSWORD_FILE=.vault_pass
+#   ansible-playbook playbooks/provision-github-runner.yaml
+#
+# Option 3: Prompt for password (interactive):
+#   ansible-playbook playbooks/provision-github-runner.yaml \
+#     --ask-vault-pass
+#
+# GITHUB PAT TOKEN SCOPES:
+# ========================
+# Required scopes for this automation:
+# - repo                 - Full control of private repositories
+# - admin:org_hook       - Write access to organization webhooks
+# - workflow             - Update GitHub Actions workflows
+#
+# For GitHub Enterprise Server, also grant:
+# - admin:repo_hook      - Write access to repository webhooks
+#
+# EXAMPLE VAULT FILE CONTENT (DO NOT COPY UNENCRYPTED):
+# ======================================================
+# vault_github_pat_token: "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+# vault_github_repo_url: "https://github.com/myorg/myrepo"
+#
+# This file SHOULD BE:
+# - Encrypted with ansible-vault
+# - Added to .gitignore
+# - Never committed to git in plaintext
+# - Protected by strong vault password
+# - Rotated regularly
+#
+# WARNING: If this file is exposed, rotate the GitHub PAT immediately!

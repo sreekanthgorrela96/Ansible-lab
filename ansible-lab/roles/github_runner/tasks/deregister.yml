@@ -1,0 +1,82 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Actions Runner Deregistration and Cleanup
+# Gracefully removes runner from GitHub and cleans up local files
+
+- name: Deregister GitHub Actions Runner
+  block:
+    - name: Check if runner is still configured
+      ansible.builtin.stat:
+        path: "{{ runner_work_dir }}/runner-config"
+      register: runner_configured_stat
+      tags: [github_runner, deregister]
+
+    - name: Stop runner service
+      ansible.builtin.systemd:
+        name: github-runner
+        state: stopped
+      become: true
+      tags: [github_runner, deregister]
+
+    - name: Run configuration script to deregister
+      ansible.builtin.shell: |
+        cd {{ runner_work_dir }}
+        source .env 2>/dev/null || true
+        ./config.sh remove --token "{{ github_pat_token }}" --unattended
+      become: true
+      become_user: "{{ runner_username }}"
+      no_log: true
+      register: deregister_result
+      when: runner_configured_stat.stat.exists
+      tags: [github_runner, deregister]
+
+    - name: Remove runner service file
+      ansible.builtin.file:
+        path: /etc/systemd/system/github-runner.service
+        state: absent
+      become: true
+      notify: Reload systemd daemon
+      tags: [github_runner, deregister]
+
+    - name: Clean up runner directory
+      ansible.builtin.file:
+        path: "{{ runner_work_dir }}"
+        state: absent
+      become: true
+      tags: [github_runner, cleanup]
+
+    - name: Remove runner user
+      ansible.builtin.user:
+        name: "{{ runner_username }}"
+        state: absent
+        remove: true
+      become: true
+      tags: [github_runner, cleanup]
+
+  rescue:
+    - name: Log deregistration failure
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner deregistration encountered an error.
+          Error: {{ ansible_failed_result.msg | default('Unknown error') }}
+          
+          Manual cleanup steps:
+          1. Stop service: systemctl stop github-runner
+          2. Remove service file: rm /etc/systemd/system/github-runner.service
+          3. Deregister manually from GitHub: Settings > Actions > Runners > Delete
+          4. Remove runner directory: rm -rf {{ runner_work_dir }}
+      tags: [github_runner, error]
+
+  always:
+    - name: Display deregistration summary
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Deregistration Complete:
+          ============================================
+          Runner Name: {{ runner_name }}
+          Service Status: Stopped
+          Runner Directory: Removed
+          
+          Verify deregistration in GitHub:
+          Settings > Actions > Runners > (Runner should no longer appear)
+      tags: [github_runner, summary]

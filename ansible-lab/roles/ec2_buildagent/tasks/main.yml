@@ -1,0 +1,125 @@
+---
+# SPDX-License-Identifier: MIT-0
+# EC2 Build Agent Provisioning
+# Launches an EC2 instance with IAM instance profile and security group for GitHub Actions runner
+# Uses block/rescue/always for graceful error handling
+
+- name: Provision EC2 Build Agent
+  block:
+    - name: Create security group for build agent
+      amazon.aws.ec2_group:
+        name: "{{ sg_name }}"
+        description: "{{ sg_description }}"
+        region: "{{ aws_region }}"
+        vpc_id: "{{ vpc_id | default(omit) }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 22
+            cidr_ip: "{{ ssh_allowed_cidr }}"
+            rule_desc: "SSH from allowed CIDR"
+          - proto: tcp
+            ports:
+              - 443
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTPS outbound for package managers"
+          - proto: tcp
+            ports:
+              - 80
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTP outbound for package managers"
+        rules_egress:
+          - proto: tcp
+            ports:
+              - 443
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTPS egress"
+          - proto: tcp
+            ports:
+              - 80
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTP egress"
+          - proto: tcp
+            ports:
+              - 53
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "DNS egress"
+          - proto: udp
+            ports:
+              - 53
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "DNS egress UDP"
+        state: present
+        tags: "{{ sg_tags }}"
+      register: ec2_sg
+      tags: [ec2_buildagent, security]
+
+    - name: Launch EC2 instance for build agent
+      amazon.aws.ec2_instance:
+        name: "{{ instance_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        region: "{{ aws_region }}"
+        key_name: "{{ key_pair_name }}"
+        security_groups:
+          - "{{ sg_name }}"
+        iam_instance_profile: "{{ iam_instance_profile }}"
+        subnet_id: "{{ subnet_id | default(omit) }}"
+        vpc_subnet_id: "{{ vpc_subnet_id | default(omit) }}"
+        network:
+          assign_public_ip: "{{ assign_public_ip }}"
+        tags: "{{ instance_tags }}"
+        wait: true
+        wait_timeout: "{{ instance_wait_timeout }}"
+        state: running
+      register: ec2_instance
+      tags: [ec2_buildagent, compute]
+
+    - name: Wait for SSH connectivity
+      ansible.builtin.wait_for:
+        host: "{{ ec2_instance.instances[0].public_ip_address | default(ec2_instance.instances[0].private_ip_address) }}"
+        port: 22
+        timeout: 300
+        delay: 10
+      tags: [ec2_buildagent, connectivity]
+
+  rescue:
+    - name: Log provisioning failure
+      ansible.builtin.debug:
+        msg: "Failed to provision EC2 build agent. Error details: {{ ansible_failed_result }}"
+
+    - name: Attempt to clean up partial security group (if created but instance failed)
+      amazon.aws.ec2_group:
+        name: "{{ sg_name }}"
+        region: "{{ aws_region }}"
+        state: absent
+      ignore_errors: true
+      tags: [ec2_buildagent, cleanup]
+
+    - name: Fail with clear error message
+      ansible.builtin.fail:
+        msg: |
+          EC2 Build Agent provisioning failed.
+          Please review the error above and retry.
+          Troubleshooting:
+            - Verify AWS credentials are configured
+            - Verify IAM instance profile exists: {{ iam_instance_profile }}
+            - Verify AMI ID exists in region: {{ aws_region }}
+            - Verify key pair exists: {{ key_pair_name }}
+            - Check VPC/subnet configuration if specified
+
+  always:
+    - name: Display EC2 instance details
+      ansible.builtin.debug:
+        msg: |
+          EC2 Build Agent Provisioning Summary:
+          =====================================
+          Instance Name: {{ instance_name }}
+          Instance ID: {{ ec2_instance.instances[0].instance_id | default('N/A') }}
+          Instance State: {{ ec2_instance.instances[0].state.name | default('N/A') }}
+          Public IP: {{ ec2_instance.instances[0].public_ip_address | default('N/A') }}
+          Private IP: {{ ec2_instance.instances[0].private_ip_address | default('N/A') }}
+          Security Group: {{ sg_name }}
+          IAM Instance Profile: {{ iam_instance_profile }}
+          Region: {{ aws_region }}
+      tags: [ec2_buildagent, summary]

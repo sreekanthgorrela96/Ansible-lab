@@ -1,0 +1,221 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Actions Self-Hosted Runner Provisioning Playbook
+# Orchestrates EC2 provisioning, tool installation, and GitHub runner registration
+# 
+# Usage:
+#   ansible-playbook -i inventory/hosts playbooks/provision-github-runner.yaml \
+#     -e "github_pat_token=ghp_xxxxx"
+#
+# Or with vault-protected PAT:
+#   ansible-playbook -i inventory/hosts playbooks/provision-github-runner.yaml \
+#     --vault-password-file=vault_pass.txt
+
+- name: Provision GitHub Actions Self-Hosted Runner on EC2
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  
+  vars:
+    # AWS Configuration (override via -e or inventory)
+    aws_region: us-east-1
+    instance_type: t3.medium
+    environment: production
+    
+    # EC2 Build Agent Variables (passed to ec2_buildagent role)
+    key_pair_name: ""  # REQUIRED: Must be set before running playbook
+    iam_instance_profile: "github-runner-ec2-profile"  # Pre-create this IAM role
+    ssh_allowed_cidr: "0.0.0.0/0"  # Restrict to your IP/VPN for security
+  
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - key_pair_name | length > 0
+          - github_pat_token | length > 0
+          - github_repo_url | length > 0
+        fail_msg: |
+          Missing required variables:
+          - key_pair_name: EC2 key pair name (REQUIRED)
+          - github_pat_token: GitHub PAT token (REQUIRED)
+          - github_repo_url: Repository URL (REQUIRED)
+          
+          Example:
+            ansible-playbook playbooks/provision-github-runner.yaml \
+              -e "key_pair_name=my-key" \
+              -e "github_pat_token=ghp_xxxx" \
+              -e "github_repo_url=https://github.com/org/repo"
+      tags: [always, validation]
+    
+    - name: Display provisioning configuration
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Provisioning Configuration:
+          ================================================
+          
+          AWS Configuration:
+            Region: {{ aws_region }}
+            Instance Type: {{ instance_type }}
+            Key Pair: {{ key_pair_name }}
+            IAM Profile: {{ iam_instance_profile }}
+            Environment: {{ environment }}
+          
+          GitHub Configuration:
+            Repository: {{ github_repo_url }}
+            Runner Name: {{ runner_name | default('(auto-generated)') }}
+            Runner Labels: {{ runner_labels | default(['self-hosted', 'linux', 'x64', 'docker', 'aws']) | join(', ') }}
+          
+          This playbook will:
+          1. Launch EC2 instance with IAM instance profile (no static keys)
+          2. Create security group with SSH + egress rules
+          3. Wait for SSH connectivity
+          4. Install Docker, Kubernetes tools, AWS CLI v2, .NET, Maven, Node.js, Python
+          5. Register as GitHub Actions self-hosted runner
+          6. Configure systemd service for auto-restart
+          7. Display instance details and next steps
+      tags: [always, summary]
+  
+  roles:
+    - role: ec2_buildagent
+      tags: [ec2, provisioning]
+  
+  post_tasks:
+    - name: Add EC2 instance to dynamic inventory
+      ansible.builtin.add_host:
+        name: "github-runner-instance"
+        ansible_host: "{{ ec2_instance.instances[0].public_ip_address }}"
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: "~/.ssh/{{ key_pair_name }}.pem"
+        groups: github_runners
+      tags: [always, inventory]
+    
+    - name: Wait for EC2 instance to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ec2_instance.instances[0].public_ip_address }}"
+        port: 22
+        timeout: 300
+        delay: 10
+      tags: [connectivity]
+    
+    - name: Store instance details for next play
+      ansible.builtin.set_fact:
+        runner_instance_id: "{{ ec2_instance.instances[0].instance_id }}"
+        runner_instance_ip: "{{ ec2_instance.instances[0].public_ip_address }}"
+      tags: [always]
+
+- name: Configure GitHub Actions Runner on EC2 Instance
+  hosts: github_runners
+  gather_facts: true
+  become: true
+  
+  vars:
+    # GitHub Runner Variables (passed to build_agent_tools and github_runner roles)
+    runner_username: github-runner
+    runner_home: /home/github-runner
+    runner_work_dir: /home/github-runner/runner
+    runner_labels:
+      - self-hosted
+      - linux
+      - x64
+      - docker
+      - aws
+      - "{{ environment | default('production') }}"
+  
+  pre_tasks:
+    - name: Display system information
+      ansible.builtin.debug:
+        msg: |
+          EC2 Instance System Information:
+          ===============================
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          CPUs: {{ ansible_processor_vcpus }}
+          Memory: {{ (ansible_memtotal_mb / 1024) | round(2) }} GB
+          Available Space: {{ (ansible_mounts[0].size_available / 1024 / 1024 / 1024) | round(2) }} GB
+      tags: [always, info]
+  
+  roles:
+    - role: build_agent_tools
+      vars:
+        install_docker: true
+        install_kubernetes_tools: true
+        install_aws_cli: true
+        install_build_tools: true
+      tags: [tools, configuration]
+    
+    - role: github_runner
+      tags: [runner, registration]
+  
+  post_tasks:
+    - name: Display runner provisioning complete
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Provisioning Complete!
+          ============================================
+          
+          Instance Details:
+            ID: {{ hostvars['localhost']['runner_instance_id'] }}
+            IP: {{ hostvars['localhost']['runner_instance_ip'] }}
+            Hostname: {{ ansible_hostname }}
+          
+          Runner Information:
+            Name: {{ runner_name | default(ansible_hostname + '-runner') }}
+            Labels: {{ runner_labels | join(', ') }}
+            Working Directory: {{ runner_work_dir }}
+          
+          Next Steps:
+          1. Verify runner in GitHub UI:
+             - Navigate to: Settings > Actions > Runners
+             - Look for runner: {{ runner_name | default(ansible_hostname + '-runner') }}
+             - Status should be "Idle" (waiting for jobs)
+          
+          2. Test runner with a workflow:
+             - Create test workflow with: runs-on: [self-hosted, linux]
+             - Trigger workflow and verify execution on this runner
+          
+          3. Monitor runner logs:
+             - SSH to instance: ssh -i ~/.ssh/{{ key_pair_name }}.pem ubuntu@{{ hostvars['localhost']['runner_instance_ip'] }}
+             - View logs: journalctl -u github-runner -f
+          
+          4. Verify installed tools:
+             - docker --version
+             - kubectl version --client
+             - aws --version
+             - dotnet --version
+             - mvn --version
+             - node --version
+             - python3 --version
+          
+          Deprovisioning:
+          Run: ansible-playbook playbooks/teardown-github-runner.yaml \
+                 -i inventory/hosts \
+                 -e "runner_instance_id={{ hostvars['localhost']['runner_instance_id'] }}"
+      tags: [always, summary]
+
+- name: Cleanup on Failure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  tasks:
+    - name: Handle provisioning failure
+      block:
+        - name: Display failure message
+          ansible.builtin.debug:
+            msg: |
+              Provisioning failed. Review error messages above.
+              
+              Troubleshooting:
+              1. Check EC2 console for instance status
+              2. Review security group rules (SSH, DNS, HTTP/HTTPS)
+              3. Verify IAM instance profile permissions
+              4. Check GitHub PAT token is valid
+              5. Verify repository URL is correct
+              
+              To cleanup failed resources manually:
+              - Terminate EC2 instance
+              - Delete security group
+              - Delete GitHub runner from Settings > Actions > Runners
+      when: ansible_failed_result is defined
+      tags: [error, cleanup]

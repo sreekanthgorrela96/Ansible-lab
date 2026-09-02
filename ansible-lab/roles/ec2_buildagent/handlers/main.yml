@@ -1,0 +1,5 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Handlers for EC2 Build Agent role
+
+# Placeholder: handlers may be added as needed for instance lifecycle events

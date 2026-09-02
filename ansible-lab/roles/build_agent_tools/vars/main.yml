@@ -1,0 +1,20 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Role-specific variables for build_agent_tools (high priority)
+
+# Download URLs and paths (can be overridden for internal mirrors)
+docker_repo_url: "https://download.docker.com"
+kubectl_release_url: "https://dl.k8s.io/release"
+helm_script_url: "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+aws_cli_url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+maven_repo_url: "https://archive.apache.org/dist/maven"
+nodejs_repo_url: "https://nodejs.org/dist"
+python_repo_url: "https://www.python.org"
+
+# Installation paths
+maven_install_path: "/opt/maven"
+nodejs_install_path: "/usr/local"
+python_install_path: "/usr/bin"
+
+# Common installation directories
+tools_install_base: "/opt"

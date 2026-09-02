@@ -1,0 +1,25 @@
+[Unit]
+Description=GitHub Actions Runner
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User={{ runner_username }}
+Group={{ runner_username }}
+WorkingDirectory={{ runner_work_dir }}
+EnvironmentFile={{ runner_work_dir }}/.env
+ExecStart={{ runner_work_dir }}/run.sh
+ExecStop={{ runner_work_dir }}/cleanup.sh
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

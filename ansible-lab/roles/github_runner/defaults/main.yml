@@ -1,0 +1,30 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Default variables for GitHub Actions runner role
+
+# GitHub Configuration (REQUIRED - must be provided at runtime)
+github_pat_token: ""  # REQUIRED: GitHub Personal Access Token with repo + admin:org_hook scopes
+github_repo_url: ""  # REQUIRED: e.g., https://github.com/myorg/myrepo
+
+# Runner Configuration
+runner_name: "{{ inventory_hostname }}-runner"  # Name visible in GitHub UI
+runner_username: github-runner  # Non-root user running the service
+runner_home: /home/github-runner  # Home directory
+runner_work_dir: /home/github-runner/runner  # Runner installation directory
+runner_labels:  # Labels for job targeting (GitHub Actions: runs-on: [self-hosted, label])
+  - self-hosted
+  - linux
+  - x64
+  - docker
+  - aws
+
+# Runner Group (GitHub Enterprise or Enterprise GitHub.com feature)
+runner_group: "default"  # Set to custom group name if using runner groups
+
+# Optional: Metadata for tracking
+runner_owner: "DevOps"  # Owner/team name
+runner_environment: "production"  # Environment tag
+
+# GitHub API Configuration
+github_api_url: "https://api.github.com"  # Adjust for GitHub Enterprise
+runner_releases_url: "https://api.github.com/repos/actions/runner/releases"  # Runner release source

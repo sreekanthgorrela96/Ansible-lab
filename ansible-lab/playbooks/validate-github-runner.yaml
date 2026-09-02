@@ -1,0 +1,356 @@
+---
+# SPDX-License-Identifier: MIT-0
+# GitHub Actions Runner Validation Playbook
+# Validates that all tools are installed and runner is properly registered
+#
+# Usage:
+#   ansible-playbook playbooks/validate-github-runner.yaml \
+#     -i inventory/hosts \
+#     -e "github_pat_token=ghp_xxxxx" \
+#     -e "github_repo_url=https://github.com/org/repo"
+
+- name: Validate GitHub Actions Self-Hosted Runner
+  hosts: github_runners
+  gather_facts: true
+  
+  vars:
+    validation_results: {}
+  
+  pre_tasks:
+    - name: Display validation header
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Validation
+          ================================
+          
+          Host: {{ inventory_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          Memory: {{ (ansible_memtotal_mb / 1024) | round(2) }} GB
+          
+          Validating:
+          - System connectivity
+          - Runner service status
+          - Installed tools and versions
+          - GitHub runner registration
+          - Tool functionality
+      tags: [always, header]
+  
+  tasks:
+    # System Connectivity
+    - name: Validate system connectivity
+      block:
+        - name: Ping localhost
+          ansible.builtin.ping:
+          register: ping_result
+        
+        - name: Test DNS resolution
+          ansible.builtin.shell: |
+            nslookup github.com | head -5
+          register: dns_result
+          changed_when: false
+        
+        - name: Test internet connectivity
+          ansible.builtin.uri:
+            url: https://api.github.com/zen
+            method: GET
+            timeout: 10
+          register: internet_result
+          changed_when: false
+        
+        - name: Set connectivity validation result
+          ansible.builtin.set_fact:
+            connectivity_valid: true
+      rescue:
+        - name: Set connectivity validation failure
+          ansible.builtin.set_fact:
+            connectivity_valid: false
+      tags: [connectivity]
+    
+    # Runner Service Status
+    - name: Validate runner service
+      block:
+        - name: Check runner service status
+          ansible.builtin.systemd:
+            name: github-runner
+          become: true
+          register: runner_service
+        
+        - name: Check runner service logs
+          ansible.builtin.shell: |
+            journalctl -u github-runner -n 20 --no-pager
+          become: true
+          register: runner_logs
+          changed_when: false
+        
+        - name: Verify runner configuration
+          ansible.builtin.stat:
+            path: /home/github-runner/runner/runner-config
+          register: runner_config_stat
+        
+        - name: Set runner service validation result
+          ansible.builtin.set_fact:
+            runner_service_valid: "{{ runner_service.status.ActiveState == 'active' and runner_config_stat.stat.exists }}"
+      rescue:
+        - name: Set runner service validation failure
+          ansible.builtin.set_fact:
+            runner_service_valid: false
+      tags: [service]
+    
+    # Docker Validation
+    - name: Validate Docker installation
+      block:
+        - name: Check Docker version
+          ansible.builtin.shell: |
+            docker --version
+          register: docker_version
+          changed_when: false
+        
+        - name: Check Docker daemon status
+          ansible.builtin.shell: |
+            docker info --format '{{.ServerVersion}}'
+          register: docker_daemon
+          changed_when: false
+        
+        - name: Test Docker hello-world
+          ansible.builtin.shell: |
+            docker run --rm hello-world | head -5
+          register: docker_test
+          changed_when: false
+          ignore_errors: true
+        
+        - name: Set Docker validation result
+          ansible.builtin.set_fact:
+            docker_valid: "{{ docker_version.rc == 0 and docker_daemon.rc == 0 }}"
+      rescue:
+        - name: Set Docker validation failure
+          ansible.builtin.set_fact:
+            docker_valid: false
+      tags: [docker]
+    
+    # Kubernetes Tools Validation
+    - name: Validate Kubernetes tools
+      block:
+        - name: Check kubectl version
+          ansible.builtin.shell: |
+            kubectl version --client 2>&1 | head -3
+          register: kubectl_version
+          changed_when: false
+        
+        - name: Check Helm version
+          ansible.builtin.shell: |
+            helm version
+          register: helm_version
+          changed_when: false
+        
+        - name: Set Kubernetes tools validation result
+          ansible.builtin.set_fact:
+            k8s_tools_valid: "{{ kubectl_version.rc == 0 and helm_version.rc == 0 }}"
+      rescue:
+        - name: Set Kubernetes tools validation failure
+          ansible.builtin.set_fact:
+            k8s_tools_valid: false
+      tags: [kubernetes]
+    
+    # AWS CLI Validation
+    - name: Validate AWS CLI
+      block:
+        - name: Check AWS CLI version
+          ansible.builtin.shell: |
+            aws --version
+          register: aws_version
+          changed_when: false
+        
+        - name: Check AWS CLI identity (requires credentials)
+          ansible.builtin.shell: |
+            aws sts get-caller-identity 2>&1 || echo "No AWS credentials configured"
+          register: aws_identity
+          changed_when: false
+          ignore_errors: true
+        
+        - name: Set AWS CLI validation result
+          ansible.builtin.set_fact:
+            aws_cli_valid: "{{ aws_version.rc == 0 }}"
+      rescue:
+        - name: Set AWS CLI validation failure
+          ansible.builtin.set_fact:
+            aws_cli_valid: false
+      tags: [aws]
+    
+    # Build Tools Validation
+    - name: Validate build tools
+      block:
+        - name: Check .NET SDK version
+          ansible.builtin.shell: |
+            dotnet --version 2>&1
+          register: dotnet_version
+          changed_when: false
+          ignore_errors: true
+        
+        - name: Check Maven version
+          ansible.builtin.shell: |
+            source /etc/profile.d/maven.sh 2>/dev/null && mvn --version 2>&1 | head -3 || mvn --version 2>&1 | head -3
+          register: maven_version
+          changed_when: false
+          ignore_errors: true
+        
+        - name: Check Node.js version
+          ansible.builtin.shell: |
+            node --version && npm --version
+          register: node_version
+          changed_when: false
+          ignore_errors: true
+        
+        - name: Check Python version
+          ansible.builtin.shell: |
+            python3 --version && pip3 --version
+          register: python_version
+          changed_when: false
+          ignore_errors: true
+        
+        - name: Set build tools validation result
+          ansible.builtin.set_fact:
+            build_tools_valid: "{{ dotnet_version.rc == 0 and maven_version.rc == 0 and node_version.rc == 0 and python_version.rc == 0 }}"
+      rescue:
+        - name: Set build tools validation failure
+          ansible.builtin.set_fact:
+            build_tools_valid: false
+      tags: [build-tools]
+    
+    # GitHub Runner Registration Validation
+    - name: Validate GitHub runner registration
+      block:
+        - name: Check if runner directory exists
+          ansible.builtin.stat:
+            path: /home/github-runner/runner
+          register: runner_dir_stat
+        
+        - name: Check runner files
+          ansible.builtin.shell: |
+            ls -la /home/github-runner/runner | grep -E "config|run.sh|cleanup.sh" | wc -l
+          register: runner_files_count
+          changed_when: false
+        
+        - name: Check systemd service file
+          ansible.builtin.stat:
+            path: /etc/systemd/system/github-runner.service
+          register: service_file_stat
+          become: true
+        
+        - name: Set runner registration validation result
+          ansible.builtin.set_fact:
+            github_registration_valid: "{{ runner_dir_stat.stat.exists and runner_files_count.stdout | int > 2 and service_file_stat.stat.exists }}"
+      rescue:
+        - name: Set runner registration validation failure
+          ansible.builtin.set_fact:
+            github_registration_valid: false
+      tags: [github]
+  
+  post_tasks:
+    - name: Compile validation results
+      ansible.builtin.set_fact:
+        validation_report:
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          hostname: "{{ ansible_hostname }}"
+          connectivity: "{{ 'PASS' if connectivity_valid else 'FAIL' }}"
+          runner_service: "{{ 'PASS' if runner_service_valid else 'FAIL' }}"
+          docker: "{{ 'PASS' if docker_valid else 'FAIL' }}"
+          kubernetes_tools: "{{ 'PASS' if k8s_tools_valid else 'FAIL' }}"
+          aws_cli: "{{ 'PASS' if aws_cli_valid else 'FAIL' }}"
+          build_tools: "{{ 'PASS' if build_tools_valid else 'FAIL' }}"
+          github_registration: "{{ 'PASS' if github_registration_valid else 'FAIL' }}"
+      tags: [always, report]
+    
+    - name: Display detailed validation report
+      ansible.builtin.debug:
+        msg: |
+          GitHub Actions Runner Validation Report
+          ========================================
+          
+          Timestamp: {{ validation_report.timestamp }}
+          Hostname: {{ validation_report.hostname }}
+          
+          VALIDATION RESULTS:
+          ==================
+          
+          Connectivity: {{ validation_report.connectivity }}
+          {{ '✓ DNS and internet connectivity working' if connectivity_valid else '✗ Network connectivity issues detected' }}
+          
+          Runner Service: {{ validation_report.runner_service }}
+          {{ '✓ Service running and configuration exists' if runner_service_valid else '✗ Service not running or config missing' }}
+          Status: {{ runner_service.status.ActiveState | default('Unknown') }}
+          
+          Docker: {{ validation_report.docker }}
+          {{ '✓ ' + docker_version.stdout if docker_valid else '✗ Docker not installed or not running' }}
+          
+          Kubernetes Tools: {{ validation_report.kubernetes_tools }}
+          {{ '✓ kubectl and Helm installed' if k8s_tools_valid else '✗ Kubernetes tools missing' }}
+          kubectl: {{ kubectl_version.stdout_lines[0] if kubectl_version.rc == 0 else 'Not installed' }}
+          Helm: {{ helm_version.stdout_lines[0] if helm_version.rc == 0 else 'Not installed' }}
+          
+          AWS CLI: {{ validation_report.aws_cli }}
+          {{ '✓ ' + aws_version.stdout if aws_cli_valid else '✗ AWS CLI not installed' }}
+          
+          Build Tools: {{ validation_report.build_tools }}
+          .NET: {{ dotnet_version.stdout if dotnet_version.rc == 0 else 'Not installed' }}
+          Maven: {{ maven_version.stdout_lines[0] if maven_version.rc == 0 else 'Not installed' }}
+          Node.js: {{ node_version.stdout if node_version.rc == 0 else 'Not installed' }}
+          Python: {{ python_version.stdout_lines[0] if python_version.rc == 0 else 'Not installed' }}
+          
+          GitHub Runner Registration: {{ validation_report.github_registration }}
+          {{ '✓ Runner directory, config, and service file present' if github_registration_valid else '✗ Runner not properly configured' }}
+          
+          
+          NEXT STEPS:
+          ===========
+          {% if validation_report.runner_service == 'PASS' %}
+          1. Runner service is active and configured
+          2. Verify in GitHub UI: Settings > Actions > Runners
+          3. Run a test workflow with: runs-on: [self-hosted, linux]
+          4. Monitor logs: journalctl -u github-runner -f
+          {% else %}
+          1. Check runner service logs: journalctl -u github-runner -n 50
+          2. Verify GitHub PAT token is valid and has correct scopes
+          3. Verify repository URL is correct
+          4. Manually deregister and re-run provisioning playbook
+          {% endif %}
+          
+          TROUBLESHOOTING:
+          ================
+          {% if docker_valid == false %}
+          - Docker: Manually install with: curl -fsSL https://get.docker.com | bash
+          {% endif %}
+          {% if k8s_tools_valid == false %}
+          - kubectl/Helm: Manually install from kubernetes.io and helm.sh
+          {% endif %}
+          {% if aws_cli_valid == false %}
+          - AWS CLI: Manually install from awscli.amazonaws.com
+          {% endif %}
+          {% if build_tools_valid == false %}
+          - Build Tools: Check /var/log/syslog or ansible playbook logs for errors
+          {% endif %}
+      tags: [always, report]
+    
+    - name: Save validation report to file
+      ansible.builtin.copy:
+        content: "{{ validation_report | to_nice_yaml }}"
+        dest: "/tmp/github-runner-validation-{{ ansible_date_time.date }}.yml"
+      tags: [report]
+    
+    - name: Summary
+      ansible.builtin.debug:
+        msg: |
+          Validation Report Summary:
+          Overall Status: {{ 'ALL PASS ✓' if (connectivity_valid and runner_service_valid and docker_valid and k8s_tools_valid and aws_cli_valid and build_tools_valid and github_registration_valid) else 'SOME FAILURES - See above' }}
+          
+          Passed Checks: 
+          {%- set passed = [] -%}
+          {%- if connectivity_valid %}{{ passed.append('Connectivity') or '' }}{%- endif -%}
+          {%- if runner_service_valid %}{{ passed.append('Runner Service') or '' }}{%- endif -%}
+          {%- if docker_valid %}{{ passed.append('Docker') or '' }}{%- endif -%}
+          {%- if k8s_tools_valid %}{{ passed.append('K8s Tools') or '' }}{%- endif -%}
+          {%- if aws_cli_valid %}{{ passed.append('AWS CLI') or '' }}{%- endif -%}
+          {%- if build_tools_valid %}{{ passed.append('Build Tools') or '' }}{%- endif -%}
+          {%- if github_registration_valid %}{{ passed.append('GitHub Registration') or '' }}{%- endif -%}
+          {{ passed | join(', ') }}
+      tags: [always, summary]

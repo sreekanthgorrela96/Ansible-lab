@@ -1,0 +1,43 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Default variables for EC2 Build Agent provisioning role
+
+# AWS Configuration
+aws_region: us-east-1
+assign_public_ip: true
+
+# Instance Configuration
+instance_type: t3.micro
+instance_name: "github-runner-{{ ansible_date_time.iso8601_basic_short }}"
+instance_wait_timeout: 300
+key_pair_name: "" # Must be provided at runtime or in inventory
+
+# AMI Configuration (Ubuntu 22.04 LTS recommended)
+# Find AMI ID: aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" --query 'sort_by(Images, &CreationDate)[-1].ImageId'
+ami_id: "ami-0885b1f6bd170450c"  # Ubuntu 22.04 LTS in us-east-1 (update as needed)
+
+# Network Configuration
+vpc_id: ""  # Optional: default VPC will be used if empty
+subnet_id: ""  # Optional: if using default VPC
+vpc_subnet_id: ""  # Optional: VPC subnet ID
+ssh_allowed_cidr: "0.0.0.0/0"  # Restrict to your IP/VPN for security
+
+# Security Group Configuration
+sg_name: "github-runner-sg-{{ ansible_date_time.iso8601_basic_short }}"
+sg_description: "Security group for GitHub Actions runner on EC2"
+sg_tags:
+  Name: "github-runner-sg"
+  ManagedBy: "Ansible"
+  Purpose: "GitHub Actions Self-Hosted Runner"
+
+# IAM Instance Profile Configuration
+# Must be pre-created with policy allowing EC2 describe, KMS, and S3 operations
+iam_instance_profile: "github-runner-ec2-profile"
+
+# Instance Tags
+instance_tags:
+  Name: "{{ instance_name }}"
+  ManagedBy: "Ansible"
+  Purpose: "GitHub Actions Self-Hosted Runner"
+  Environment: "{{ environment | default('dev') }}"
+  Owner: "{{ owner | default('DevOps') }}"

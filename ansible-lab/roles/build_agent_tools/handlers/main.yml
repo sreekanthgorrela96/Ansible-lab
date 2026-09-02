@@ -1,0 +1,24 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Handlers for build_agent_tools role
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  tags: [build_agent_tools, handlers]
+
+- name: Restart docker daemon
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  become: true
+  tags: [build_agent_tools, handlers]
+
+- name: Start docker service
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+  tags: [build_agent_tools, handlers]

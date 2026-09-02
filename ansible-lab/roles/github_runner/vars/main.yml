@@ -1,0 +1,20 @@
+---
+# SPDX-License-Identifier: MIT-0
+# Role-specific variables for github_runner (high priority, not easily overridden)
+
+# Runner release and version
+runner_release_base_url: "https://github.com/actions/runner/releases/download"
+runner_os: "linux"
+runner_arch: "x64"
+
+# Service configuration
+runner_service_name: "github-runner"
+runner_service_file: "/etc/systemd/system/github-runner.service"
+
+# Polling and timeout configuration
+runner_api_timeout: 30  # seconds
+runner_download_timeout: 600  # seconds
+runner_registration_timeout: 300  # seconds
+
+# Common configuration
+runner_unattended: true  # Run registration without prompts
