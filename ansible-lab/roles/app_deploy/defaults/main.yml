@@ -1,7 +1,7 @@
 ---
 # S3 artifact source. Set these per environment or in the playbook.
-app_s3_bucket: ""
-app_s3_key: ""
+app_s3_bucket: "ansible-lab-artifacts-422836431778-960c3c49"
+app_s3_key: "simple-app.zip"
 app_s3_region: us-east-1
 app_artifact_type: zip # zip or jar
 
