@@ -1,0 +1,7 @@
+---
+- name: Deploy application artifact from S3
+  hosts: all
+  become: true
+  gather_facts: false
+  roles:
+    - role: app_deploy

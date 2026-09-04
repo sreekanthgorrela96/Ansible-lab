@@ -1,0 +1,80 @@
+---
+- name: Validate application deployment inputs
+  ansible.builtin.assert:
+    that:
+      - app_s3_bucket | length > 0
+      - app_s3_key | length > 0
+      - app_artifact_type in ['zip', 'jar']
+      - app_service_name | length > 0
+      - app_healthcheck_url | length > 0
+    fail_msg: >-
+      Set app_s3_bucket, app_s3_key, app_service_name, and app_healthcheck_url;
+      app_artifact_type must be either zip or jar.
+
+- name: Create application deployment directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ app_root }}"
+    - "{{ app_root }}/downloads"
+    - "{{ app_release_path }}"
+    - "{{ app_config_path | dirname }}"
+
+- name: Download application artifact from S3
+  amazon.aws.s3_object:
+    mode: get
+    bucket: "{{ app_s3_bucket }}"
+    object: "{{ app_s3_key }}"
+    dest: "{{ app_artifact_path }}"
+    region: "{{ app_s3_region }}"
+    overwrite: different
+  register: app_artifact_download
+  notify: Restart application service
+
+- name: Extract application archive
+  ansible.builtin.unarchive:
+    src: "{{ app_artifact_path }}"
+    dest: "{{ app_release_path }}"
+    remote_src: true
+    owner: root
+    group: root
+  when: app_artifact_type == 'zip'
+  notify: Restart application service
+
+- name: Install executable JAR artifact
+  ansible.builtin.copy:
+    src: "{{ app_artifact_path }}"
+    dest: "{{ app_release_path }}/{{ app_name }}.jar"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0644'
+  when: app_artifact_type == 'jar'
+  notify: Restart application service
+
+- name: Render application configuration
+  ansible.builtin.template:
+    src: application.yml.j2
+    dest: "{{ app_config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart application service
+
+- name: Apply pending application restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify application health endpoint
+  ansible.builtin.uri:
+    url: "{{ app_healthcheck_url }}"
+    method: GET
+    status_code: 200
+    return_content: false
+  register: app_healthcheck
+  retries: "{{ app_healthcheck_retries }}"
+  delay: "{{ app_healthcheck_delay }}"
+  until: app_healthcheck.status == 200

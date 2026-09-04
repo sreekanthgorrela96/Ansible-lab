@@ -1,0 +1,29 @@
+---
+# S3 artifact source. Set these per environment or in the playbook.
+app_s3_bucket: ""
+app_s3_key: ""
+app_s3_region: us-east-1
+app_artifact_type: zip # zip or jar
+
+# Deployment layout and service settings.
+app_name: simple-app
+app_root: /opt/app
+app_release_path: "{{ app_root }}/releases/{{ app_name }}"
+app_artifact_path: "{{ app_root }}/downloads/{{ app_name }}.{{ app_artifact_type }}"
+app_config_path: "{{ app_root }}/config/application.yml"
+app_service_name: "{{ app_name }}"
+
+# Configuration rendered by templates/application.yml.j2.
+app_config:
+  server:
+    port: 8080
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info
+
+# The service must expose this endpoint after a deployment.
+app_healthcheck_url: http://127.0.0.1:8080/actuator/health
+app_healthcheck_retries: 12
+app_healthcheck_delay: 5
