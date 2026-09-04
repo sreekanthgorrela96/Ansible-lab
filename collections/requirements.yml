@@ -3,6 +3,8 @@ collections:
   - name: community.aws.aws_ssm
   - name: community.mysql
   - name: amazon.aws
+  - name: community.aws
+    version: ">=5.0.0"
   - name: ansible.posix
     version: ">=1.5.0"
   - name: community.general
