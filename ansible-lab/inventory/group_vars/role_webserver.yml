@@ -1,0 +1,55 @@
+---
+# Webserver Role Group Variables
+# Applied to all hosts in role_webserver group (created by keyed_groups on Role=webserver tag)
+# Precedence: group_vars/all.yml < group_vars/env_*.yml < group_vars/role_webserver.yml < host_vars/
+#
+# Usage: ansible-playbook deploy-site.yml --limit role_webserver
+
+role_name: webserver
+role_type: application_server
+
+# Webserver port configuration
+http_port: 80
+https_port: 443
+health_check_port: 8080
+
+# Application settings
+app_user: www-data
+app_group: www-data
+app_home: /var/www/app
+app_port: 8080
+
+# Webserver packages
+webserver_packages:
+  - nginx
+  - curl
+  - wget
+  - certbot
+  - python3-certbot-nginx
+
+# Service management
+webserver_service: nginx
+webserver_service_enabled: true
+webserver_service_state: started
+
+# Performance tuning for webservers
+enable_http2: true
+enable_gzip: true
+enable_caching: true
+cache_directory: /var/cache/nginx
+worker_processes: "auto"
+
+# Security for webservers
+enable_ssl: true
+ssl_protocols: "TLSv1.2 TLSv1.3"
+ssl_ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256"
+enable_modsecurity: false
+enable_rate_limiting: true
+rate_limit_requests: 100
+rate_limit_window: 10s
+
+# Monitoring
+enable_metrics_collection: true
+metrics_port: 9113  # nginx-prometheus-exporter
+enable_logging: true
+log_retention_days: 7

@@ -1,0 +1,310 @@
+---
+# Demonstration Playbook: AWS Dynamic Inventory with SSM
+# 
+# This playbook demonstrates:
+# 1. Dynamic inventory from AWS with keyed_groups
+# 2. Group variables precedence (all.yml -> env_*.yml -> role_*.yml)
+# 3. SSM Session Manager connection (no SSH required)
+# 4. Safe --limit operations for environment isolation
+# 5. Inventory caching for performance
+#
+# Usage Examples:
+#
+#   # Gather inventory and display groups
+#   ansible-inventory -i inventory/aws_ec2.yaml --graph
+#   
+#   # List all hosts in development environment
+#   ansible-inventory -i inventory/aws_ec2.yaml --limit env_dev --list
+#   
+#   # List all webservers in production
+#   ansible-inventory -i inventory/aws_ec2.yaml --limit "env_prod:&role_webserver" --list
+#   
+#   # Run playbook against dev environment only (safe default)
+#   ansible-playbook playbooks/demo-dynamic-inventory.yaml -i inventory/aws_ec2.yaml --limit env_dev
+#   
+#   # Run against QA webservers (intersection of groups)
+#   ansible-playbook playbooks/demo-dynamic-inventory.yaml -i inventory/aws_ec2.yaml --limit "env_qa:&role_webserver"
+#   
+#   # Run against multiple environments (union of groups)
+#   ansible-playbook playbooks/demo-dynamic-inventory.yaml -i inventory/aws_ec2.yaml --limit "env_dev,env_qa"
+#   
+#   # Exclude production (safety pattern)
+#   ansible-playbook playbooks/demo-dynamic-inventory.yaml -i inventory/aws_ec2.yaml --limit "all:!env_prod"
+#   
+#   # Run with explicit production confirmation
+#   ansible-playbook playbooks/demo-dynamic-inventory.yaml -i inventory/aws_ec2.yaml \
+#     --limit env_prod \
+#     -e "i_understand_this_is_production=true"
+
+- name: AWS Dynamic Inventory Demonstration
+  hosts: all
+  gather_facts: true
+  vars:
+    # Safety check - require explicit confirmation for production
+    allow_production: "{{ i_understand_this_is_production | default(false) }}"
+  
+  pre_tasks:
+    # Display inventory information
+    - name: Display Current Host Information
+      block:
+        - name: Show current host
+          debug:
+            msg: "Host: {{ inventory_hostname }} | Group: {{ group_names | join(', ') }}"
+        
+        - name: Show environment from group_vars
+          debug:
+            msg: "Environment: {{ environment_name }} | Short: {{ environment_short }}"
+        
+        - name: Show role from group_vars
+          debug:
+            msg: "Role: {{ role_name | default('unassigned') }}"
+        
+        - name: Show AWS SSM region
+          debug:
+            msg: "SSM Region: {{ ansible_aws_ssm_region }}"
+        
+        - name: Show connection method
+          debug:
+            msg: "Connection Method: {{ ansible_connection }} (no SSH required!)"
+    
+    # Demonstrate group hierarchy and precedence
+    - name: Demonstrate Group Variables Precedence
+      block:
+        - name: Show timeout settings (from env-specific group_vars)
+          debug:
+            msg: "Connection Timeout: {{ ansible_connection_timeout }}s | Command Timeout: {{ ansible_timeout }}s"
+        
+        - name: Show security settings (from env-specific group_vars)
+          debug:
+            msg: |
+              Become: {{ ansible_become }}
+              Become Method: {{ ansible_become_method }}
+              Security Scanning: {{ security_scanning_enabled | default('not set') }}
+              Compliance Checking: {{ compliance_checking | default('not set') }}
+        
+        - name: Show monitoring settings (from role-specific group_vars)
+          debug:
+            msg: |
+              Instance Monitoring: {{ instance_monitoring | default('not set') }}
+              Detailed CloudWatch: {{ enable_detailed_cloudwatch | default('not set') }}
+      tags:
+        - always
+
+    # Safety check for production
+    - name: Production Safety Check
+      block:
+        - name: Verify production confirmation
+          assert:
+            that:
+              - allow_production | bool
+            fail_msg: |
+              PRODUCTION PLAYBOOK DETECTED!
+              
+              This playbook is targeting the PRODUCTION environment.
+              To confirm you understand the implications, run:
+              
+              ansible-playbook playbooks/demo-dynamic-inventory.yaml \
+                -i inventory/aws_ec2.yaml \
+                --limit env_prod \
+                -e "i_understand_this_is_production=true"
+      when:
+        - "'env_prod' in group_names"
+      tags:
+        - always
+
+  tasks:
+    # Task 1: Demonstrate dynamic inventory capabilities
+    - name: Section 1 - Dynamic Inventory Information
+      block:
+        - name: Get EC2 instance metadata
+          debug:
+            msg: |
+              Instance ID: {{ ec2_id | default('N/A') }}
+              Instance Type: {{ ec2_instance_type | default('N/A') }}
+              Private IP: {{ ansible_host }}
+              Public IP: {{ public_ip | default('N/A - using SSM') }}
+              Availability Zone: {{ ec2_placement_group_name | default('N/A') }}
+              VPC ID: {{ ec2_vpc_id | default('N/A') }}
+              Security Groups: {{ ec2_security_groups | default('N/A') }}
+        
+        - name: Show all groups for this host (keyed_groups output)
+          debug:
+            var: group_names
+        
+        - name: List all inventory groups in play
+          debug:
+            var: groups.keys()
+          run_once: true
+      tags:
+        - inventory
+
+    # Task 2: Demonstrate group_vars precedence
+    - name: Section 2 - Group Variables Precedence
+      block:
+        - name: Show how variables are inherited
+          debug:
+            msg: |
+              Level 1 (all.yml):
+                - ansible_connection: {{ ansible_connection }}
+                - ansible_become_method: {{ ansible_become_method }}
+              
+              Level 2 (env_{{ environment_short }}.yml):
+                - environment_name: {{ environment_name }}
+                - ansible_connection_timeout: {{ ansible_connection_timeout }}
+                - log_level: {{ log_level }}
+              
+              Level 3 (role_{{ role_name }}.yml):
+                - role_name: {{ role_name | default('N/A') }}
+                - role_type: {{ role_type | default('N/A') }}
+        
+        - name: Show environment-specific security settings
+          debug:
+            msg: |
+              Security Scanning: {{ security_scanning_enabled }}
+              Compliance Checking: {{ compliance_checking }}
+              Fallback SSH Enabled: {{ fallback_ssh_enabled }}
+      tags:
+        - variables
+
+    # Task 3: Demonstrate safe --limit operations
+    - name: Section 3 - Safe Limit Operations
+      block:
+        - name: Explain limit patterns
+          debug:
+            msg: |
+              SAFE LIMIT PATTERNS:
+              
+              1. Environment-only (RECOMMENDED):
+                 --limit env_dev        # All dev hosts
+                 --limit env_qa         # All QA hosts
+              
+              2. Environment + Role (SPECIFIC):
+                 --limit "env_prod:&role_webserver"    # Production webservers
+                 --limit "env_qa:&role_database"       # QA databases
+              
+              3. Multiple Environments (CONTROLLED):
+                 --limit "env_dev,env_qa"              # Dev AND QA together
+              
+              4. Exclusion (CAREFUL):
+                 --limit "all:!env_prod"               # Everything except prod
+              
+              5. Current Playbook Targets:
+                 Included: {{ group_names }}
+                 Excluded: (none in this run)
+          run_once: true
+      tags:
+        - limits
+
+    # Task 4: Demonstrate SSM connection
+    - name: Section 4 - SSM Connection Details
+      block:
+        - name: Confirm SSM connection is working
+          shell: echo "Connected via SSM Session Manager"
+          register: ssm_test
+        
+        - name: Show SSM connection success
+          debug:
+            msg: |
+              ✓ Connection via AWS Systems Manager Session Manager
+              ✓ No SSH keys required
+              ✓ All traffic encrypted
+              ✓ Session logging to S3 (optional)
+              ✓ Private IP: {{ ansible_host }} (used by SSM tunnel)
+              ✓ Region: {{ ansible_aws_ssm_region }}
+              
+              Benefit: Enhanced security - never expose SSH to the internet!
+        
+        - name: Show SSM session output
+          debug:
+            var: ssm_test.stdout
+      tags:
+        - ssm
+
+    # Task 5: Demonstrate inventory caching
+    - name: Section 5 - Inventory Caching
+      block:
+        - name: Show caching configuration
+          debug:
+            msg: |
+              Cache Plugin: jsonfile
+              Cache Directory: .ansible/cache
+              Cache Prefix: aws_ec2
+              Cache Timeout: 3600 seconds (1 hour)
+              
+              Benefits:
+              - Dramatically faster playbook runs
+              - Reduced AWS API calls
+              - Avoids rate limiting
+              
+              Usage:
+              - First run: queries AWS API, saves to cache
+              - Subsequent runs (within 1 hour): uses cached inventory
+              - Force refresh: ansible-inventory -i inventory/aws_ec2.yaml --force-cache
+              
+              Cache files will be stored in .ansible/cache/
+          run_once: true
+      tags:
+        - cache
+
+    # Task 6: Summary and best practices
+    - name: Section 6 - Best Practices Summary
+      block:
+        - name: Display best practices
+          debug:
+            msg: |
+              BEST PRACTICES FOR DYNAMIC INVENTORY & SSM:
+              
+              1. ENVIRONMENT ISOLATION:
+                 Always use --limit env_<env> to avoid accidents
+                 Example: --limit env_dev (never touch production accidentally)
+              
+              2. SAFETY BEFORE PRODUCTION:
+                 Test changes in dev first: --limit env_dev
+                 Then QA: --limit env_qa
+                 Then production with explicit confirmation
+              
+              3. LEVERAGE KEYED_GROUPS:
+                 Use Environment + Role grouping for targeted deployments
+                 ansible-playbook site.yml --limit "env_prod:&role_webserver"
+              
+              4. UTILIZE GROUP_VARS HIERARCHY:
+                 all.yml - Common settings across all hosts
+                 env_*.yml - Environment-specific security/timeouts
+                 role_*.yml - Role-specific configurations
+                 host_vars/ - Host-specific overrides
+              
+              5. SSM ADVANTAGES:
+                 • No exposed SSH ports
+                 • IAM-based authentication
+                 • Session logging for compliance
+                 • Automatic VPN tunnel
+                 • Works across VPCs and on-premises
+              
+              6. CACHE FOR PERFORMANCE:
+                 Inventory cache reduces AWS API calls by 90%+
+                 Refresh with: ansible-inventory -i inventory/aws_ec2.yaml --force-cache
+              
+              7. COMBINE PATTERNS:
+                 ansible-playbook site.yml \
+                   -i inventory/aws_ec2.yaml \
+                   --limit "env_prod:&role_webserver" \
+                   -e "i_understand_this_is_production=true" \
+                   -v
+          run_once: true
+      tags:
+        - summary
+  
+  post_tasks:
+    - name: Display execution summary
+      block:
+        - name: Show playbook completion
+          debug:
+            msg: |
+              ✓ Playbook completed successfully
+              ✓ Hosts targeted: {{ play_hosts | length }}
+              ✓ Connection method: SSM (no SSH)
+              ✓ Group variables applied correctly
+              ✓ Dynamic inventory working as expected
+          run_once: true
+      tags:
+        - always

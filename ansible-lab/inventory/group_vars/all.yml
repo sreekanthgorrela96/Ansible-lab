@@ -1,0 +1,46 @@
+---
+# Global group variables for all inventory hosts
+# Applies to all environments, overridable at environment level
+
+# AWS SSM Connection Plugin Configuration
+# Uses AWS Systems Manager Session Manager to connect without SSH
+# Requires: community.aws collection, IAM role with SSM permissions
+ansible_connection: community.aws.aws_ssm
+ansible_aws_ssm_region: us-east-1  # Adjust to match your primary region
+
+# SSM Session Manager Options
+# See: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-sessions-start-ssh-session.html
+ansible_aws_ssm_bucket_name: ~     # S3 bucket for session logging (optional)
+ansible_aws_ssm_bucket_region: ~   # Region for S3 bucket (optional)
+
+# Default SSH key behavior with SSM (not needed, SSM handles auth)
+# These are kept for compatibility but not used with SSM
+ansible_ssh_private_key_file: ~
+ansible_ssh_common_args: ~
+
+# Timeout settings for long-running operations
+ansible_timeout: 300  # 5 minutes for command execution
+ansible_connect_timeout: 60
+
+# Python interpreter - specify if using custom/bundled Python
+ansible_python_interpreter: /usr/bin/python3
+
+# Become (sudo) configuration
+ansible_become: false  # Set per-playbook or per-role as needed
+ansible_become_method: sudo
+ansible_become_user: ec2-user  # Or 'ubuntu' depending on AMI
+
+# Facts gathering - disable by default for dynamic inventory (can be slow)
+# Enable at playbook level if needed: gather_facts: true
+gather_facts: false
+
+# AWS-specific variables
+aws_region: us-east-1
+aws_profile: default
+
+# Common tags/metadata for instance grouping
+# These will be populated by compose/keyed_groups from EC2 tags
+# Available after inventory is parsed:
+# - env_tag: Environment tag value (e.g., 'dev')
+# - role_tag: Role tag value (e.g., 'webserver')
+# - public_ip: Public IP address (stored for reference)

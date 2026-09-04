@@ -1,0 +1,229 @@
+---
+# Playbook: Create EC2 Instances with Proper Tags for Dynamic Inventory
+# 
+# This playbook demonstrates how to create EC2 instances with tags that will be
+# automatically discovered by the aws_ec2.yaml dynamic inventory plugin.
+#
+# Tags used by dynamic inventory:
+# - Environment: dev, qa, uat, stg, prod
+# - Role: webserver, database, loadbalancer, etc.
+# - Name: Descriptive instance name
+#
+# Usage:
+#   ansible-playbook playbooks/create-ec2-tagged.yaml \
+#     -e "environment=dev" \
+#     -e "instance_role=webserver" \
+#     -e "instance_count=2"
+
+- name: Create Tagged EC2 Instances for Dynamic Inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  vars:
+    aws_region: us-east-1
+    environment: dev                    # Override with -e "environment=prod"
+    instance_role: webserver            # Override with -e "instance_role=database"
+    instance_count: 1
+    instance_type: t3.medium
+    ami_id: ami-0c55b159cbfafe1f0      # Amazon Linux 2 in us-east-1
+    
+    # SSH key for manual access (in case SSM fails)
+    key_name: ansible-key
+    
+    # Security group - must allow HTTPS 443 for SSM
+    security_group_name: ansible-ssm-sg
+    
+    # VPC and subnet (adjust to your environment)
+    vpc_id: vpc-12345678
+    subnet_id: subnet-12345678
+  
+  pre_tasks:
+    - name: Validate environment variable
+      assert:
+        that:
+          - environment in ['dev', 'qa', 'uat', 'stg', 'prod']
+        fail_msg: "Environment must be one of: dev, qa, uat, stg, prod"
+    
+    - name: Confirm production deployment
+      block:
+        - name: Display production warning
+          debug:
+            msg: |
+              ⚠️  PRODUCTION DEPLOYMENT DETECTED
+              
+              Environment: {{ environment }}
+              Instance Role: {{ instance_role }}
+              Instance Count: {{ instance_count }}
+              
+              This will create {{ instance_count }} production instance(s).
+              Please verify before proceeding.
+        
+        - name: Require explicit production confirmation
+          assert:
+            that:
+              - confirm_production_deployment | default(false) | bool
+            fail_msg: |
+              To confirm production deployment, run with:
+              -e "confirm_production_deployment=true"
+      when: environment == 'prod'
+  
+  tasks:
+    - name: Ensure security group exists for SSM
+      amazon.aws.ec2_group:
+        name: "{{ security_group_name }}"
+        description: "Security group for Ansible SSM access"
+        vpc_id: "{{ vpc_id }}"
+        region: "{{ aws_region }}"
+        rules:
+          # Allow HTTPS for SSM Session Manager
+          - proto: tcp
+            ports:
+              - 443
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "HTTPS for SSM Session Manager"
+          
+          # Optional: Allow SSH for manual access
+          - proto: tcp
+            ports:
+              - 22
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "SSH for manual access (SSM preferred)"
+          
+          # Allow outbound to Systems Manager
+          - proto: -1
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "All outbound"
+      register: security_group_result
+      tags:
+        - security
+    
+    - name: Create EC2 instances with SSM-enabled IAM role
+      amazon.aws.ec2_instance:
+        name: "{{ '%s-%s-%02d' | format(environment, instance_role, item) }}"
+        region: "{{ aws_region }}"
+        image_id: "{{ ami_id }}"
+        instance_type: "{{ instance_type }}"
+        key_name: "{{ key_name }}"
+        security_group: "{{ security_group_name }}"
+        subnet_id: "{{ subnet_id }}"
+        
+        # IAM role with SSM permissions
+        iam_instance_profile: EC2-SSM-InstanceProfile
+        
+        # Monitoring
+        monitoring: "{{ 'yes' if environment in ['prod', 'stg'] else 'no' }}"
+        
+        # Termination protection for production
+        termination_protection: "{{ environment == 'prod' }}"
+        
+        # Tags for dynamic inventory
+        tags:
+          Environment: "{{ environment }}"
+          Role: "{{ instance_role }}"
+          Name: "{{ '%s-%s-%02d' | format(environment, instance_role, item) }}"
+          CreatedBy: Ansible
+          CreatedDate: "{{ ansible_date_time.iso8601 }}"
+          ManagedBy: Terraform  # Or Ansible, as appropriate
+        
+        # EBS configuration
+        volumes:
+          - device_name: /dev/xvda
+            ebs:
+              volume_size: 50
+              volume_type: gp3
+              iops: 3000
+              throughput: 125
+              delete_on_termination: true
+              encrypted: "{{ environment in ['prod', 'uat', 'stg'] }}"
+        
+        state: running
+        wait: true
+      loop: "{{ range(1, instance_count + 1) | list }}"
+      register: ec2_instances
+      tags:
+        - create
+    
+    - name: Display created instances
+      debug:
+        msg: |
+          ✓ Created {{ instance_count }} instance(s):
+          
+          {% for instance in ec2_instances.results %}
+          Instance: {{ instance.instances[0].tags.Name }}
+            Instance ID: {{ instance.instances[0].instance_id }}
+            Private IP: {{ instance.instances[0].private_ip_address }}
+            State: {{ instance.instances[0].state.name }}
+            Type: {{ instance.instances[0].instance_type }}
+          {% endfor %}
+          
+          Next Steps:
+          1. Wait for SSM Agent to initialize (2-3 minutes)
+          2. Verify instances appear in dynamic inventory:
+             ansible-inventory -i inventory/aws_ec2.yaml --graph
+          3. Run demo playbook:
+             ansible-playbook playbooks/demo-dynamic-inventory.yaml \
+               -i inventory/aws_ec2.yaml \
+               --limit env_{{ environment }}:&role_{{ instance_role }}
+      tags:
+        - always
+    
+    - name: Wait for SSM Agent to be ready
+      amazon.aws.ec2_instance_info:
+        instance_ids:
+          - "{{ item.instances[0].instance_id }}"
+        region: "{{ aws_region }}"
+      register: instance_check
+      until: instance_check.instances[0].state.name == 'running'
+      retries: 30
+      delay: 10
+      loop: "{{ ec2_instances.results }}"
+      tags:
+        - wait
+    
+    - name: Verify SSM Agent connectivity
+      block:
+        - name: Get Systems Manager instance information
+          amazon.aws.ssm_instance_information:
+            filters:
+              - key: tag:Name
+                value: "{{ '%s-%s-%02d' | format(environment, instance_role, item) }}"
+          register: ssm_info
+          loop: "{{ range(1, instance_count + 1) | list }}"
+          retries: 5
+          delay: 30
+        
+        - name: Display SSM connectivity status
+          debug:
+            msg: |
+              ✓ SSM Agent Status:
+              {% for info in ssm_info.results %}
+              Instance: {{ info.instances[0].instance_id if info.instances else 'NOT READY' }}
+                Ping Status: {{ info.instances[0].ping_status if info.instances else 'Initializing...' }}
+                SSM Agent Version: {{ info.instances[0].agent_version if info.instances else 'N/A' }}
+              {% endfor %}
+          when: ssm_info.results | length > 0
+      tags:
+        - verify
+
+  post_tasks:
+    - name: Display summary
+      debug:
+        msg: |
+          ✓ Playbook completed successfully!
+          
+          Created instances are now ready for Ansible management via SSM.
+          
+          Inventory commands:
+          - ansible-inventory -i inventory/aws_ec2.yaml --graph
+          - ansible-inventory -i inventory/aws_ec2.yaml --limit env_{{ environment }} --list
+          
+          Run playbooks:
+          - ansible-playbook playbooks/demo-dynamic-inventory.yaml \
+              -i inventory/aws_ec2.yaml \
+              --limit env_{{ environment }}
+          
+          Refresh inventory cache:
+          - ansible-inventory -i inventory/aws_ec2.yaml --force-cache
+      tags:
+        - always

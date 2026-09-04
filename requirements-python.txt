@@ -1,0 +1,35 @@
+# Python Package Requirements for AWS Dynamic Inventory with SSM
+# 
+# Install with: pip install -r requirements-python.txt
+# 
+# These packages are needed for:
+# - amazon.aws.aws_ec2 inventory plugin
+# - community.aws.aws_ssm connection plugin
+# - AWS API interactions
+# - JSON caching
+
+# Core AWS SDK
+boto3>=1.28.0          # AWS SDK for Python
+botocore>=1.31.0       # Botocore (dependency of boto3)
+
+# Ansible and collections
+ansible-core>=2.13.0   # Core Ansible
+# amazon.aws collection (install via ansible-galaxy)
+# community.aws collection (install via ansible-galaxy)
+
+# Optional: For better performance
+PyYAML>=6.0           # YAML parsing (usually pre-installed)
+Jinja2>=3.0           # Jinja2 templating (usually pre-installed)
+
+# Optional: For session logging to S3
+# (Only needed if ansible_aws_ssm_bucket_name is configured)
+# s3transfer>=0.6.0
+
+# Optional: For local testing and development
+# pytest>=7.0          # Testing framework
+# pytest-mock>=3.0     # Mocking for tests
+# black>=22.0          # Code formatter
+# pylint>=2.0          # Linter
+
+# Optional: AWS CLI (for manual testing)
+# awscli>=1.27.0

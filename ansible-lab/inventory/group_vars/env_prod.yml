@@ -1,0 +1,69 @@
+---
+# Production Environment Group Variables
+# Applied to all hosts in env_prod group (created by keyed_groups on Environment=prod tag)
+# Precedence: group_vars/all.yml < group_vars/env_prod.yml < host_vars/
+#
+# IMPORTANT: All changes require change management approval
+# Usage: ansible-playbook site.yml --limit env_prod
+#
+# Safety features:
+# - Requires explicit confirmation via --extra-vars "i_understand_this_is_production=true"
+# - SSM-only access (no SSH)
+# - Strict security compliance
+# - Full monitoring and alerting
+
+environment_name: production
+environment_short: prod
+
+# Production AWS SSM settings
+# May span multiple regions for redundancy
+ansible_aws_ssm_region: us-east-1
+secondary_ssm_region: eu-west-1
+
+# Conservative timeouts for production
+ansible_connection_timeout: 90
+ansible_timeout: 600
+
+# Elevated privileges required for infrastructure changes
+ansible_become: true
+ansible_become_method: sudo
+
+# Production logging (minimal, for performance)
+log_level: WARN
+enable_performance_logging: false
+
+# ENFORCE SSM-only access - NO SSH BACKDOORS
+fallback_ssh_enabled: false
+
+# Production monitoring and alerting
+instance_monitoring: true
+enable_detailed_cloudwatch: true
+enable_alarms: true
+alert_email: infrastructure-alerts@company.com
+
+# Strict security and compliance
+security_scanning_enabled: true
+compliance_checking: true
+allow_security_exemptions: false
+
+# Production change management
+require_approval_for_changes: true
+maintenance_window_required: true
+maintenance_windows:
+  - day: Sunday
+    start_hour: 02
+    end_hour: 04
+    timezone: UTC
+
+# Production deployment strategy
+allow_rolling_deployments: true
+deployment_batch_size: "25%"
+zero_downtime_required: true
+health_check_interval: 10
+max_consecutive_failures: 3
+
+# Production backup and recovery
+enable_backups: true
+backup_retention_days: 30
+cross_region_backup: true
+snapshot_before_changes: true

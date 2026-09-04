@@ -1,0 +1,76 @@
+---
+# Load Balancer Role Group Variables
+# Applied to all hosts in role_loadbalancer group (created by keyed_groups on Role=loadbalancer tag)
+# Precedence: group_vars/all.yml < group_vars/env_*.yml < group_vars/role_loadbalancer.yml < host_vars/
+#
+# Usage: ansible-playbook deploy-loadbalancer.yml --limit role_loadbalancer
+
+role_name: loadbalancer
+role_type: network_service
+
+# Load balancer configuration
+lb_engine: haproxy  # or nginx, traefik
+lb_port: 80
+lb_https_port: 443
+lb_stats_port: 8404
+
+# Load balancing algorithm
+balancing_algorithm: roundrobin  # or leastconn, source, uri, etc.
+session_persistence: enabled
+session_timeout: 3600
+
+# Backend pool configuration
+upstream_check_interval: 5000  # milliseconds
+upstream_check_timeout: 2000
+upstream_check_rise: 2
+upstream_check_fall: 5
+
+# Connection settings
+connection_timeout: 5000  # milliseconds
+send_timeout: 30000
+receive_timeout: 30000
+client_body_timeout: 30000
+
+# Load balancer health checks
+enable_health_checks: true
+health_check_path: /health
+health_check_interval: 10  # seconds
+health_check_timeout: 5
+healthy_threshold: 2
+unhealthy_threshold: 3
+
+# SSL/TLS configuration
+enable_ssl_termination: true
+ssl_protocols: "TLSv1.2 TLSv1.3"
+ssl_ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256"
+enable_http2: true
+enable_compression: true
+
+# Security features
+enable_waf: false  # Set to true if using WAF
+enable_ddos_protection: true
+enable_rate_limiting: true
+rate_limit_requests: 1000
+rate_limit_window: 1m
+
+# Sticky sessions
+enable_sticky_sessions: false
+sticky_cookie_name: SERVERID
+sticky_cookie_ttl: 3600
+
+# Monitoring and statistics
+enable_stats_page: true
+stats_uri: /stats
+enable_syslog_logging: true
+log_format: detailed
+enable_metrics_collection: true
+metrics_port: 9101  # HAProxy prometheus exporter
+
+# Advanced features
+enable_compression: true
+compression_types:
+  - text/html
+  - text/css
+  - text/javascript
+  - application/json
+  - application/xml

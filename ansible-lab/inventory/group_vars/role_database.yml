@@ -1,0 +1,57 @@
+---
+# Database Role Group Variables
+# Applied to all hosts in role_database group (created by keyed_groups on Role=database tag)
+# Precedence: group_vars/all.yml < group_vars/env_*.yml < group_vars/role_database.yml < host_vars/
+#
+# Usage: ansible-playbook deploy-database.yml --limit role_database
+
+role_name: database
+role_type: data_store
+
+# Database configuration
+db_engine: mysql  # or postgresql, mariadb
+db_port: 3306
+db_version: "8.0"
+db_socket: /var/run/mysqld/mysqld.sock
+
+# Database user and authentication
+db_root_user: root
+db_admin_user: dbadmin
+db_backup_user: dbbackup
+
+# Database paths and storage
+db_data_dir: /var/lib/mysql
+db_backup_dir: /var/backups/mysql
+db_log_dir: /var/log/mysql
+
+# Database performance tuning
+innodb_buffer_pool_size: "80%"
+innodb_log_file_size: 512M
+max_connections: 1000
+query_cache_enabled: false
+
+# Database security
+enable_ssl_for_replication: true
+require_secure_transport: true
+validate_password_policy: STRONG
+enable_encryption_at_rest: true
+
+# Database backups
+enable_automated_backups: true
+backup_schedule: "0 2 * * *"  # 2 AM daily
+backup_retention_days: 30
+enable_point_in_time_recovery: true
+backup_compression: true
+
+# Replication (if applicable)
+enable_replication: false
+replication_user: repl_user
+binlog_retention_days: 7
+
+# Monitoring and health checks
+enable_performance_schema: true
+enable_slow_query_log: true
+slow_query_threshold: 2  # seconds
+enable_metrics_collection: true
+enable_heartbeat_monitoring: true
+heartbeat_interval: 1  # second

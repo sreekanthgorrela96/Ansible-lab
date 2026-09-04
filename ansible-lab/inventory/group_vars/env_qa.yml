@@ -1,0 +1,36 @@
+---
+# QA Environment Group Variables
+# Applied to all hosts in env_qa group (created by keyed_groups on Environment=qa tag)
+# Precedence: group_vars/all.yml < group_vars/env_qa.yml < host_vars/
+#
+# Usage: ansible-playbook site.yml --limit env_qa
+
+environment_name: quality_assurance
+environment_short: qa
+
+# QA-specific AWS SSM settings
+ansible_aws_ssm_region: us-east-1
+
+# Moderate timeout for QA testing
+ansible_connection_timeout: 45
+ansible_timeout: 300
+
+# QA can use elevated privileges for testing
+ansible_become: true
+ansible_become_method: sudo
+
+# QA logging for test analysis
+log_level: INFO
+enable_performance_logging: true
+
+# Enable SSM-only (no SSH fallback) to match production-like environment
+fallback_ssh_enabled: false
+
+# QA host management
+instance_monitoring: true
+enable_detailed_cloudwatch: true
+
+# Enable security checks but allow overrides for testing
+security_scanning_enabled: true
+compliance_checking: false
+allow_security_exemptions: true  # For test-specific scenarios

@@ -1,0 +1,37 @@
+---
+# Development Environment Group Variables
+# Applied to all hosts in env_dev group (created by keyed_groups on Environment=dev tag)
+# Precedence: group_vars/all.yml < group_vars/env_dev.yml < host_vars/
+#
+# Usage: ansible-playbook site.yml --limit env_dev
+
+environment_name: development
+environment_short: dev
+
+# Development-specific AWS SSM settings
+ansible_aws_ssm_region: us-east-1
+
+# No need for high availability in dev
+ansible_connection_timeout: 30
+ansible_timeout: 180
+
+# Development can use less strict security settings
+ansible_become: true
+ansible_become_method: sudo
+
+# Development logging
+log_level: DEBUG
+enable_performance_logging: true
+
+# Allow direct SSH fallback in dev if SSM fails (optional)
+# Comment out to enforce SSM-only access
+fallback_ssh_enabled: true
+
+# Development-specific host management
+# Use smaller instance types, fewer replicas, etc.
+instance_monitoring: false
+enable_detailed_cloudwatch: false
+
+# Disable unnecessary security features in dev for faster iteration
+security_scanning_enabled: false
+compliance_checking: false

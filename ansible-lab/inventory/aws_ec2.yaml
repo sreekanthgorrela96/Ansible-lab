@@ -1,21 +1,88 @@
-# inventory/aws_ec2.yaml
+# AWS EC2 Dynamic Inventory Plugin Configuration
+# Demonstrates: keyed_groups, compose, cache, SSM connection plugin
+# Usage: ansible-inventory -i inventory/aws_ec2.yaml --list
+#        ansible-playbook -i inventory/aws_ec2.yaml site.yml --limit env_dev
 
 plugin: amazon.aws.aws_ec2
 
+# AWS Configuration
+aws_profile: default          # Optional: specify AWS CLI profile
 regions:
-  - us-east-1
+  - us-east-1               # Adjust to your regions
+  - us-west-2
+  - eu-west-1
 
+# Instance Filtering
 filters:
   instance-state-name: running
+  # Uncomment to filter by tag:
+  # "tag:Environment": ["dev", "qa", "uat", "stg", "prod"]
+  # "tag:ManagedBy": "terraform"
 
+# Hostname Resolution (in order of preference)
 hostnames:
-  - ip-address
-  - private-ip-address
+  - dns-name                # Public DNS name
+  - private-ip-address      # Falls back to private IP if no public DNS
 
+# COMPOSE: Build ansible_host from private IP for SSM connections
+# Private IP ensures SSM Sessions Manager can tunnel to the instance
 compose:
-  ansible_host: public_ip_address | default(private_ip_address)
+  # Use private IP for ansible_host (SSM will tunnel through it)
+  ansible_host: private_ip_address
+  
+  # Optional: Store public IP for reference
+  public_ip: public_ip_address
+  
+  # Construct AWS tags as individual variables
+  env_tag: ec2_tags.get("Environment", "unknown")
+  role_tag: ec2_tags.get("Role", "unknown")
 
+# KEYED_GROUPS: Create groups based on AWS tags
+# Demonstrates group hierarchy for --limit safety and group_vars precedence
 keyed_groups:
+  # Group by Environment tag: env_dev, env_qa, env_uat, env_stg, env_prod
+  - key: ec2_tags.Environment
+    prefix: env
+    separator: _
+    parent_group: environments
+    strict: false
+  
+  # Group by Role tag: role_webserver, role_database, role_loadbalancer, etc.
+  - key: ec2_tags.Role
+    prefix: role
+    separator: _
+    parent_group: roles
+    strict: false
+  
+  # Group by Name tag: tag_Name_web01, tag_Name_db01, etc.
   - key: ec2_tags.Name
-    prefix: tag_Name
-    separator: "_"
+    prefix: tag
+    separator: _
+  
+  # Optional: Group by EC2 security groups
+  - key: security_groups | map(attribute='group_name') | list
+    prefix: sg
+    separator: _
+  
+  # Optional: Group by instance type for infrastructure management
+  - key: instance_type
+    prefix: type
+    separator: _
+
+# CACHE PLUGIN: Store inventory results to avoid repeated API calls
+# Dramatically speeds up playbook runs and reduces AWS API throttling
+cache_plugin: jsonfile
+cache_dir: .ansible/cache
+cache_prefix: aws_ec2
+cache_timeout: 3600  # Cache for 1 hour
+
+# Groups for parent hierarchy (created by keyed_groups)
+# These are used for --limit operations and group_vars organization
+groups:
+  # Top-level environments group
+  ungrouped: []
+
+# Connection Settings for SSM
+# Note: Actual connection plugin is set per-group via group_vars
+connection_plugin: community.aws.aws_ssm
+# These settings are inherited by group_vars/all.yml or environment-specific vars
