@@ -1,0 +1,18 @@
+- name: Check current SSM user
+  ansible.builtin.command: whoami
+  register: current_user
+  changed_when: false
+
+- name: Check become user
+  ansible.builtin.command: whoami
+  become: true
+  become_method: sudo
+  become_user: root
+  register: become_user
+  changed_when: false
+
+- name: Display users
+  ansible.builtin.debug:
+    msg:
+      - "Current user: {{ current_user.stdout }}"
+      - "Become user: {{ become_user.stdout }}"
