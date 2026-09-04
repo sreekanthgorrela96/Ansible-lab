@@ -12,6 +12,9 @@
       app_artifact_type must be either zip or jar.
 
 - name: Create application deployment directories
+  become: true
+  become_method: sudo
+  become_user: root
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -25,6 +28,9 @@
     - "{{ app_config_path | dirname }}"
 
 - name: Download application artifact from S3
+  become: true
+  become_method: sudo
+  become_user: root
   amazon.aws.s3_object:
     mode: get
     bucket: "{{ app_s3_bucket }}"
@@ -36,6 +42,7 @@
   notify: Restart application service
 
 - name: Extract application archive
+  become: true
   ansible.builtin.unarchive:
     src: "{{ app_artifact_path }}"
     dest: "{{ app_release_path }}"
@@ -46,6 +53,7 @@
   notify: Restart application service
 
 - name: Install executable JAR artifact
+  become: true
   ansible.builtin.copy:
     src: "{{ app_artifact_path }}"
     dest: "{{ app_release_path }}/{{ app_name }}.jar"
@@ -57,6 +65,7 @@
   notify: Restart application service
 
 - name: Render application configuration
+  become: true
   ansible.builtin.template:
     src: application.yml.j2
     dest: "{{ app_config_path }}"
