@@ -1,6 +1,6 @@
 ---
 # SPDX-License-Identifier: MIT-0
-# Docker CE installation with block/rescue/always pattern
+# Docker installation with block/rescue/always pattern
 
 - name: Install Docker CE (Debian)
   block:
@@ -44,17 +44,34 @@
   when: is_debian
   tags: [build_agent_tools, docker]
 
-- name: Install Docker CE (RedHat/Amazon Linux)
+- name: Install Docker (Amazon Linux)
+  block:
+    - name: Install Amazon Linux docker package
+      ansible.builtin.dnf:
+        name: docker
+        state: present
+      become: true
+      tags: [build_agent_tools, docker]
+
+  rescue:
+    - name: Log Docker installation failure (Amazon Linux)
+      ansible.builtin.debug:
+        msg: "Docker installation failed on Amazon Linux. Continuing with other tools."
+      tags: [build_agent_tools, docker]
+
+  when: is_amazon_linux
+  tags: [build_agent_tools, docker]
+
+- name: Install Docker CE (RedHat)
   block:
     - name: Add Docker repository (RedHat)
-      ansible.builtin.shell: |
-        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      ansible.builtin.command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
       become: true
       changed_when: false
       tags: [build_agent_tools, docker]
 
     - name: Install Docker packages (RedHat)
-      ansible.builtin.yum:
+      ansible.builtin.dnf:
         name:
           - docker-ce
           - docker-ce-cli
@@ -67,14 +84,28 @@
   rescue:
     - name: Log Docker installation failure (RedHat)
       ansible.builtin.debug:
-        msg: "Docker installation failed on RedHat/Amazon Linux. Continuing with other tools."
+        msg: "Docker installation failed on RedHat. Continuing with other tools."
       tags: [build_agent_tools, docker]
 
-  when: is_rhel
+  when: is_rhel and not is_amazon_linux
+  tags: [build_agent_tools, docker]
+
+- name: Check whether docker binary is present
+  ansible.builtin.command: docker --version
+  register: docker_bin_check
+  changed_when: false
+  failed_when: false
   tags: [build_agent_tools, docker]
 
 - name: Configure Docker for runner user
   block:
+    - name: Ensure docker group exists
+      ansible.builtin.group:
+        name: docker
+        state: present
+      become: true
+      tags: [build_agent_tools, docker]
+
     - name: Add runner user to docker group
       ansible.builtin.user:
         name: "{{ runner_username }}"
@@ -92,8 +123,7 @@
       tags: [build_agent_tools, docker]
 
     - name: Validate Docker installation
-      ansible.builtin.shell: |
-        docker --version
+      ansible.builtin.command: docker --version
       register: docker_version
       changed_when: false
       tags: [build_agent_tools, docker]
@@ -109,10 +139,5 @@
         msg: "Docker configuration failed. Please verify manually."
       tags: [build_agent_tools, docker]
 
-  always:
-    - name: Notify Docker daemon reload if needed
-      ansible.builtin.debug:
-        msg: "Docker configuration complete"
-      tags: [build_agent_tools, docker]
-
+  when: docker_bin_check.rc == 0
   tags: [build_agent_tools, docker]

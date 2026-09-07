@@ -64,6 +64,26 @@
 
     - name: Register runner with GitHub
       block:
+        - name: Derive GitHub repo API path
+          ansible.builtin.set_fact:
+            github_repo_api_path: "{{ github_repo_url | regex_replace('^https://github.com/', '') | regex_replace('\\.git$', '') }}"
+          tags: [github_runner, registration]
+
+        - name: Request GitHub runner registration token
+          ansible.builtin.uri:
+            url: "{{ github_api_url }}/repos/{{ github_repo_api_path }}/actions/runners/registration-token"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ github_pat_token }}"
+              Accept: "application/vnd.github+json"
+              X-GitHub-Api-Version: "2022-11-28"
+            body_format: json
+            body: {}
+            status_code: [201]
+          register: github_runner_reg_token
+          no_log: true
+          tags: [github_runner, registration]
+
         - name: Create runner configuration environment file
           ansible.builtin.template:
             src: runner-config-env.j2
@@ -76,16 +96,17 @@
           tags: [github_runner, registration]
 
         - name: Run configuration script
-          ansible.builtin.shell: |
-            cd {{ runner_work_dir }}
-            source .env
-            ./config.sh --url "{{ github_repo_url }}" \
-              --token "{{ github_pat_token }}" \
-              --name "{{ runner_name }}" \
-              --labels "{{ runner_labels | join(',') }}" \
-              --work "{{ runner_work_dir }}/_work" \
-              --runnergroup "{{ runner_group }}" \
+          ansible.builtin.shell:
+            cmd: >
+              ./config.sh
+              --url "{{ github_repo_url }}"
+              --token "{{ github_runner_reg_token.json.token }}"
+              --name "{{ runner_name }}"
+              --labels "{{ runner_labels | join(',') }}"
+              --work "{{ runner_work_dir }}/_work"
               --unattended
+              --replace
+            chdir: "{{ runner_work_dir }}"
           become: true
           become_user: "{{ runner_username }}"
           no_log: true

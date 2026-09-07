@@ -18,7 +18,7 @@ docker_version: "latest"
 kubectl_version: "v1.27.0"  # Update as needed
 helm_version: "v3.12.0"  # Installed via script, pinned on release
 maven_version: "3.9.2"  # Update as needed
-dotnet_version: "7.0"  # Update as needed
+dotnet_version: "8.0"  # LTS; available on Amazon Linux 2023
 nodejs_version: "v18.17.0"  # Update as needed
 
 # Package manager and installation method

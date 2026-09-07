@@ -11,7 +11,7 @@
   tags: [build_agent_tools, prerequisites]
 
 - name: Update package manager cache (RedHat)
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     update_cache: true
   become: true
   when: is_rhel
@@ -42,27 +42,52 @@
   when: is_debian
   tags: [build_agent_tools, prerequisites]
 
+- name: Install prerequisite packages (Amazon Linux)
+  block:
+    - name: Install base packages (Amazon Linux)
+      ansible.builtin.dnf:
+        name:
+          - git
+          - unzip
+          - jq
+          - ca-certificates
+          - gnupg2
+          - wget
+          - dnf-plugins-core
+          - libicu
+          - tar
+          - gzip
+          - shadow-utils
+        state: present
+      become: true
+  rescue:
+    - name: Log prerequisite installation failure
+      ansible.builtin.debug:
+        msg: "Failed to install prerequisites on Amazon Linux"
+  when: is_amazon_linux
+  tags: [build_agent_tools, prerequisites]
+
 - name: Install prerequisite packages (RedHat)
   block:
     - name: Install base packages
-      ansible.builtin.yum:
+      ansible.builtin.dnf:
         name:
           - git
-          - curl
           - unzip
           - jq
           - ca-certificates
           - gnupg2
           - wget
           - yum-utils
-          - yum-cron
+          - libicu
+          - tar
         state: present
       become: true
   rescue:
     - name: Log prerequisite installation failure
       ansible.builtin.debug:
         msg: "Failed to install prerequisites on RedHat system"
-  when: is_rhel
+  when: is_rhel and not is_amazon_linux
   tags: [build_agent_tools, prerequisites]
 
 - name: Create runner user if not exists
