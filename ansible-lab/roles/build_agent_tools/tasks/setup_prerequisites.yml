@@ -51,7 +51,6 @@
           - unzip
           - jq
           - ca-certificates
-          - gnupg2
           - wget
           - dnf-plugins-core
           - libicu

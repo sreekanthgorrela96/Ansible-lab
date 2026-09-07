@@ -3,7 +3,8 @@
 # Default variables for GitHub Actions runner role
 
 # GitHub Configuration (REQUIRED - must be provided at runtime)
-github_pat_token: ""  # REQUIRED: GitHub Personal Access Token with repo + admin:org_hook scopes
+# REQUIRED: PAT with repo admin. Classic: "repo". Fine-grained: Administration=Read and write.
+github_pat_token: ""
 github_repo_url: ""  # REQUIRED: e.g., https://github.com/myorg/myrepo
 
 # Runner Configuration

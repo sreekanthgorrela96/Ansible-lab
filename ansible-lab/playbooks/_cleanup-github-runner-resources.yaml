@@ -1,4 +1,10 @@
 ---
+# AWX: create a job template with this playbook, Demo Inventory (localhost),
+# the aws-ssm execution environment, and the same AWS credential used by provision.
+# Playbook path: ansible-lab/playbooks/_cleanup-github-runner-resources.yaml
+#
+# CLI:
+#   ansible-playbook ansible-lab/playbooks/_cleanup-github-runner-resources.yaml
 - name: Remove resources created by provision-github-runner.yaml
   hosts: localhost
   connection: local

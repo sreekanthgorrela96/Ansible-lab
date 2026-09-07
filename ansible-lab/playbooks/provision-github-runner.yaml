@@ -14,7 +14,6 @@
 - name: Provision GitHub Actions Self-Hosted Runner on EC2
   hosts: localhost
   connection: local
-  become: false
   gather_facts: true
   become: false
 
@@ -59,14 +58,51 @@
               -e "github_repo_url=https://github.com/org/repo"
       tags: [always, validation]
     
+    - name: Find leftover runner instances from previous runs
+      amazon.aws.ec2_instance_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Purpose": "GitHub Actions Self-Hosted Runner"
+          instance-state-name:
+            - pending
+            - running
+            - stopping
+            - stopped
+      register: leftover_runners
+      retries: 3
+      delay: 8
+      tags: [always, cleanup]
+
     - name: Terminate leftover instances from previous failed runs
       amazon.aws.ec2_instance:
-        instance_ids: "{{ leftover_instance_ids }}"
+        instance_ids: "{{ ((leftover_instance_ids | default([])) + (leftover_runners.instances | default([]) | map(attribute='instance_id') | list)) | unique }}"
         region: "{{ aws_region }}"
         state: absent
         wait: true
-      when: leftover_instance_ids | default([]) | length > 0
+        wait_timeout: 300
+      when: ((leftover_instance_ids | default([])) + (leftover_runners.instances | default([]) | map(attribute='instance_id') | list)) | unique | length > 0
       retries: 3
+      delay: 8
+      tags: [always, cleanup]
+
+    - name: Find leftover runner security groups
+      amazon.aws.ec2_security_group_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Purpose": "GitHub Actions Self-Hosted Runner"
+      register: leftover_runner_sgs
+      retries: 3
+      delay: 8
+      tags: [always, cleanup]
+
+    - name: Delete leftover runner security groups
+      amazon.aws.ec2_group:
+        group_id: "{{ item.group_id }}"
+        region: "{{ aws_region }}"
+        state: absent
+      loop: "{{ leftover_runner_sgs.security_groups | default([]) }}"
+      ignore_errors: true
+      retries: 5
       delay: 8
       tags: [always, cleanup]
     
@@ -132,7 +168,6 @@
     - ../inventory/group_vars/github_runners/vault.yml
 
   vars:
-    github_pat_token: "{{ vault_github_pat_token | default('') }}"
     github_repo_url: "{{ vault_github_repo_url | default('https://github.com/sreekanthgorrela96/Ansible-lab.git') }}"
     key_pair_name: "{{ vault_ec2_key_pair_name | default('Ansikey') }}"
     # GitHub Runner Variables (passed to build_agent_tools and github_runner roles)
@@ -148,6 +183,15 @@
       - "{{ runner_environment | default(environment) | default('production') }}"
   
   pre_tasks:
+    - name: Use vault GitHub PAT when extra-vars did not provide one
+      ansible.builtin.set_fact:
+        github_pat_token: "{{ vault_github_pat_token }}"
+      when:
+        - github_pat_token | default('') | length == 0
+        - vault_github_pat_token | default('') | length > 0
+      no_log: true
+      tags: [always]
+
     - name: Wait for SSM Session Manager connectivity
       ansible.builtin.wait_for_connection:
         delay: 20

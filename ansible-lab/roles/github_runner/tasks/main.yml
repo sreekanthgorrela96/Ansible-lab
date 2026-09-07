@@ -79,9 +79,32 @@
               X-GitHub-Api-Version: "2022-11-28"
             body_format: json
             body: {}
-            status_code: [201]
+            status_code: [201, 401, 403, 404]
           register: github_runner_reg_token
           no_log: true
+          failed_when: false
+          tags: [github_runner, registration]
+
+        - name: Fail if GitHub denied the registration token
+          ansible.builtin.fail:
+            msg: |
+              GitHub returned HTTP {{ github_runner_reg_token.status | default('unknown') }}
+              when requesting a runner registration token for {{ github_repo_api_path }}.
+              {{ github_runner_reg_token.json.message | default(github_runner_reg_token.msg | default('')) }}
+
+              A token that can clone the repo is not enough. Registering a self-hosted
+              runner requires repository admin access.
+
+              Classic PAT (ghp_...): enable the full "repo" scope.
+              Fine-grained PAT (github_pat_...):
+                - Resource owner: the repository owner
+                - Repository access: this repository
+                - Repository permissions: Administration = Read and write
+
+              Create a token at https://github.com/settings/tokens
+              Then set github_pat_token on the AWX job template extra variables
+              (or update vault_github_pat_token) and re-run.
+          when: github_runner_reg_token.status | default(0) != 201
           tags: [github_runner, registration]
 
         - name: Create runner configuration environment file
