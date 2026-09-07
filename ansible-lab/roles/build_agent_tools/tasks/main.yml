@@ -12,7 +12,7 @@
   ansible.builtin.assert:
     that:
       - ansible_os_family in ['Debian', 'RedHat']
-      - ansible_distribution in ['Ubuntu', 'Debian', 'Amazon Linux']
+      - ansible_distribution in ['Ubuntu', 'Debian', 'Amazon Linux', 'Amazon']
     fail_msg: |
       This role requires Ubuntu, Debian, or Amazon Linux.
       Detected: {{ ansible_distribution }} ({{ ansible_os_family }})
@@ -33,7 +33,7 @@
     is_debian: "{{ ansible_os_family == 'Debian' }}"
     is_rhel: "{{ ansible_os_family == 'RedHat' }}"
     is_ubuntu: "{{ ansible_distribution == 'Ubuntu' }}"
-    is_amazon_linux: "{{ ansible_distribution == 'Amazon Linux' }}"
+    is_amazon_linux: "{{ ansible_distribution in ['Amazon Linux', 'Amazon'] }}"
   tags: [build_agent_tools, vars]
 
 - name: Include prerequisites setup

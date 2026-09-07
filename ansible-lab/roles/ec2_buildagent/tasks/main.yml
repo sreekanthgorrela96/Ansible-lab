@@ -52,6 +52,9 @@
         state: present
         tags: "{{ sg_tags }}"
       register: ec2_sg
+      retries: 5
+      delay: 8
+      until: ec2_sg is succeeded
       tags: [ec2_buildagent, security]
 
     - name: Launch EC2 instance for build agent
@@ -63,9 +66,9 @@
         key_name: "{{ key_pair_name }}"
         security_groups:
           - "{{ sg_name }}"
-        iam_instance_profile: "{{ iam_instance_profile }}"
-        subnet_id: "{{ subnet_id | default(omit) }}"
-        vpc_subnet_id: "{{ vpc_subnet_id | default(omit) }}"
+        iam_instance_profile: "{{ iam_instance_profile | default(omit, true) }}"
+        subnet_id: "{{ subnet_id if (subnet_id | default('') | length) > 0 else omit }}"
+        vpc_subnet_id: "{{ vpc_subnet_id if (vpc_subnet_id | default('') | length) > 0 else omit }}"
         network:
           assign_public_ip: "{{ assign_public_ip }}"
         tags: "{{ instance_tags }}"
@@ -73,20 +76,30 @@
         wait_timeout: "{{ instance_wait_timeout }}"
         state: running
       register: ec2_instance
+      retries: 5
+      delay: 8
+      until: ec2_instance is succeeded
       tags: [ec2_buildagent, compute]
-
-    - name: Wait for SSH connectivity
-      ansible.builtin.wait_for:
-        host: "{{ ec2_instance.instances[0].public_ip_address | default(ec2_instance.instances[0].private_ip_address) }}"
-        port: 22
-        timeout: 300
-        delay: 10
-      tags: [ec2_buildagent, connectivity]
 
   rescue:
     - name: Log provisioning failure
       ansible.builtin.debug:
         msg: "Failed to provision EC2 build agent. Error details: {{ ansible_failed_result }}"
+
+    - name: Terminate instance if launch partially succeeded
+      amazon.aws.ec2_instance:
+        instance_ids:
+          - "{{ ec2_instance.instances[0].instance_id }}"
+        region: "{{ aws_region }}"
+        state: absent
+        wait: true
+      when:
+        - ec2_instance is defined
+        - ec2_instance.instances is defined
+        - ec2_instance.instances | length > 0
+        - ec2_instance.instances[0].instance_id is defined
+      ignore_errors: true
+      tags: [ec2_buildagent, cleanup]
 
     - name: Attempt to clean up partial security group (if created but instance failed)
       amazon.aws.ec2_group:

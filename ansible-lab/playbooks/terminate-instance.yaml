@@ -1,0 +1,23 @@
+---
+- name: Terminate a leftover EC2 instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    ansible_connection: local
+    ansible_become: false
+    aws_region: us-east-1
+  tasks:
+    - name: Terminate instance
+      amazon.aws.ec2_instance:
+        instance_ids:
+          - "{{ runner_instance_id }}"
+        region: "{{ aws_region }}"
+        state: absent
+        wait: true
+      register: terminate_result
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: terminate_result

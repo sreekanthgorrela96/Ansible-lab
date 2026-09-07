@@ -1,0 +1,86 @@
+---
+- name: Remove resources created by provision-github-runner.yaml
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    ansible_connection: local
+    ansible_become: false
+    aws_region: us-east-1
+  tasks:
+    - name: Find runner instances by Purpose tag
+      amazon.aws.ec2_instance_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Purpose": "GitHub Actions Self-Hosted Runner"
+          instance-state-name:
+            - pending
+            - running
+            - stopping
+            - stopped
+      register: runners_by_purpose
+      retries: 4
+      delay: 8
+      until: runners_by_purpose is succeeded
+
+    - name: Find runner instances by Name prefix
+      amazon.aws.ec2_instance_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Name": "github-runner-*"
+          instance-state-name:
+            - pending
+            - running
+            - stopping
+            - stopped
+      register: runners_by_name
+      retries: 4
+      delay: 8
+      until: runners_by_name is succeeded
+
+    - name: Build unique instance id list
+      ansible.builtin.set_fact:
+        runner_instance_ids: "{{ ((runners_by_purpose.instances | default([])) + (runners_by_name.instances | default([]))) | map(attribute='instance_id') | unique | list }}"
+        runner_security_groups: "{{ ((runners_by_purpose.instances | default([])) + (runners_by_name.instances | default([]))) | map(attribute='security_groups') | flatten | map(attribute='group_id') | unique | list }}"
+
+    - name: Show instances that will be terminated
+      ansible.builtin.debug:
+        msg: "Terminating instances: {{ runner_instance_ids | default([]) }}"
+
+    - name: Terminate runner instances
+      amazon.aws.ec2_instance:
+        instance_ids: "{{ runner_instance_ids }}"
+        region: "{{ aws_region }}"
+        state: absent
+        wait: true
+        wait_timeout: 300
+      register: terminate_runners
+      when: runner_instance_ids | length > 0
+      retries: 4
+      delay: 10
+      until: terminate_runners is succeeded
+
+    - name: Find leftover github-runner security groups
+      amazon.aws.ec2_security_group_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Purpose": "GitHub Actions Self-Hosted Runner"
+      register: runner_sgs
+      retries: 4
+      delay: 8
+      until: runner_sgs is succeeded
+
+    - name: Delete leftover runner security groups
+      amazon.aws.ec2_group:
+        group_id: "{{ item.group_id }}"
+        region: "{{ aws_region }}"
+        state: absent
+      loop: "{{ runner_sgs.security_groups | default([]) }}"
+      ignore_errors: true
+      retries: 5
+      delay: 10
+
+    - name: Cleanup complete
+      ansible.builtin.debug:
+        msg: "Runner EC2 instances and security groups have been removed."

@@ -16,24 +16,35 @@
   connection: local
   become: false
   gather_facts: true
-  
+  become: false
+
+  vars_files:
+    - ../inventory/group_vars/github_runners/vault.yml
+
   vars:
     # AWS Configuration (override via -e or inventory)
     aws_region: us-east-1
-    instance_type: t3.medium
-    environment: production
-    
+    instance_type: t3.micro
+    runner_environment: production
+    ansible_connection: local
+    ansible_become: false
+
+    # Map vault secrets when extra-vars are not provided (AWX inventory does not load repo group_vars)
+    github_pat_token: "{{ vault_github_pat_token | default('') }}"
+    github_repo_url: "{{ vault_github_repo_url | default('https://github.com/sreekanthgorrela96/Ansible-lab.git') }}"
+    key_pair_name: "{{ vault_ec2_key_pair_name | default('Ansikey') }}"
+
     # EC2 Build Agent Variables (passed to ec2_buildagent role)
-    key_pair_name: ""  # REQUIRED: Must be set before running playbook
-    iam_instance_profile: "github-runner-ec2-profile"  # Pre-create this IAM role
+    iam_instance_profile: "arn:aws:iam::422836431778:instance-profile/AnsibleLabSSMInstanceProfile"
     ssh_allowed_cidr: "0.0.0.0/0"  # Restrict to your IP/VPN for security
+    ssm_s3_bucket: ansible-lab-artifacts-422836431778-960c3c49
   
   pre_tasks:
     - name: Validate required variables
       ansible.builtin.assert:
         that:
           - key_pair_name | length > 0
-          - github_pat_token | length > 0
+          - github_pat_token | default('') | length > 0
           - github_repo_url | length > 0
         fail_msg: |
           Missing required variables:
@@ -48,6 +59,17 @@
               -e "github_repo_url=https://github.com/org/repo"
       tags: [always, validation]
     
+    - name: Terminate leftover instances from previous failed runs
+      amazon.aws.ec2_instance:
+        instance_ids: "{{ leftover_instance_ids }}"
+        region: "{{ aws_region }}"
+        state: absent
+        wait: true
+      when: leftover_instance_ids | default([]) | length > 0
+      retries: 3
+      delay: 8
+      tags: [always, cleanup]
+    
     - name: Display provisioning configuration
       ansible.builtin.debug:
         msg: |
@@ -59,7 +81,7 @@
             Instance Type: {{ instance_type }}
             Key Pair: {{ key_pair_name }}
             IAM Profile: {{ iam_instance_profile }}
-            Environment: {{ environment }}
+            Environment: {{ runner_environment | default(environment) | default('production') }}
           
           GitHub Configuration:
             Repository: {{ github_repo_url }}
@@ -78,38 +100,41 @@
   
   roles:
     - role: ec2_buildagent
+      when: existing_instance_id | default('') | length == 0
       tags: [ec2, provisioning]
   
   post_tasks:
     - name: Add EC2 instance to dynamic inventory
       ansible.builtin.add_host:
         name: "github-runner-instance"
-        ansible_host: "{{ ec2_instance.instances[0].public_ip_address }}"
-        ansible_user: ubuntu
-        ansible_ssh_private_key_file: "~/.ssh/{{ key_pair_name }}.pem"
+        ansible_host: "{{ existing_instance_id if (existing_instance_id | default('') | length > 0) else ec2_instance.instances[0].instance_id }}"
+        ansible_user: ec2-user
+        ansible_connection: community.aws.aws_ssm
+        ansible_aws_ssm_region: "{{ aws_region }}"
+        ansible_aws_ssm_bucket_name: "{{ ssm_s3_bucket }}"
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_become: true
         groups: github_runners
       tags: [always, inventory]
     
-    - name: Wait for EC2 instance to be ready
-      ansible.builtin.wait_for:
-        host: "{{ ec2_instance.instances[0].public_ip_address }}"
-        port: 22
-        timeout: 300
-        delay: 10
-      tags: [connectivity]
-    
     - name: Store instance details for next play
       ansible.builtin.set_fact:
-        runner_instance_id: "{{ ec2_instance.instances[0].instance_id }}"
-        runner_instance_ip: "{{ ec2_instance.instances[0].public_ip_address }}"
+        runner_instance_id: "{{ existing_instance_id if (existing_instance_id | default('') | length > 0) else ec2_instance.instances[0].instance_id }}"
+        runner_instance_ip: "{{ existing_instance_ip | default(ec2_instance.instances[0].public_ip_address | default('N/A')) }}"
       tags: [always]
 
 - name: Configure GitHub Actions Runner on EC2 Instance
   hosts: github_runners
-  gather_facts: true
+  gather_facts: false
   become: true
-  
+
+  vars_files:
+    - ../inventory/group_vars/github_runners/vault.yml
+
   vars:
+    github_pat_token: "{{ vault_github_pat_token | default('') }}"
+    github_repo_url: "{{ vault_github_repo_url | default('https://github.com/sreekanthgorrela96/Ansible-lab.git') }}"
+    key_pair_name: "{{ vault_ec2_key_pair_name | default('Ansikey') }}"
     # GitHub Runner Variables (passed to build_agent_tools and github_runner roles)
     runner_username: github-runner
     runner_home: /home/github-runner
@@ -120,9 +145,19 @@
       - x64
       - docker
       - aws
-      - "{{ environment | default('production') }}"
+      - "{{ runner_environment | default(environment) | default('production') }}"
   
   pre_tasks:
+    - name: Wait for SSM Session Manager connectivity
+      ansible.builtin.wait_for_connection:
+        delay: 20
+        timeout: 360
+      tags: [always, connectivity]
+
+    - name: Gather facts over SSM
+      ansible.builtin.setup:
+      tags: [always]
+
     - name: Display system information
       ansible.builtin.debug:
         msg: |

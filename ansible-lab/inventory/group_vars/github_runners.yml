@@ -25,7 +25,7 @@ runner_labels:
 
 # AWS EC2 Configuration for runners
 aws_region: us-east-1
-instance_type: t3.medium
+instance_type: t3.micro
 environment: production
 owner: DevOps
 
