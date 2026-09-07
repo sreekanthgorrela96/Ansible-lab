@@ -107,10 +107,38 @@
           when: github_runner_reg_token.status | default(0) != 201
           tags: [github_runner, registration]
 
-        - name: Create runner configuration environment file
-          ansible.builtin.template:
-            src: runner-config-env.j2
-            dest: "{{ runner_work_dir }}/.env"
+        - name: Normalize GitHub repo URL for config.sh
+          ansible.builtin.set_fact:
+            github_repo_config_url: "{{ github_repo_url | regex_replace('\\.git$', '') }}"
+          tags: [github_runner, registration]
+
+        - name: Install GitHub runner native packages
+          ansible.builtin.dnf:
+            name:
+              - libicu
+              - krb5-libs
+              - openssl-libs
+              - zlib
+            state: present
+          become: true
+          when: ansible_os_family == 'RedHat'
+          tags: [github_runner, registration]
+
+        - name: Make runner scripts executable
+          ansible.builtin.file:
+            path: "{{ runner_work_dir }}/{{ item }}"
+            mode: "0755"
+          become: true
+          loop:
+            - config.sh
+            - run.sh
+            - svc.sh
+          tags: [github_runner, registration]
+
+        - name: Write registration token for config.sh
+          ansible.builtin.copy:
+            content: "{{ github_runner_reg_token.json.token }}"
+            dest: "{{ runner_work_dir }}/.runner_token"
             owner: "{{ runner_username }}"
             group: "{{ runner_username }}"
             mode: "0600"
@@ -118,22 +146,42 @@
           no_log: true
           tags: [github_runner, registration]
 
-        - name: Run configuration script
-          ansible.builtin.shell:
-            cmd: >
-              ./config.sh
-              --url "{{ github_repo_url }}"
-              --token "{{ github_runner_reg_token.json.token }}"
-              --name "{{ runner_name }}"
-              --labels "{{ runner_labels | join(',') }}"
-              --work "{{ runner_work_dir }}/_work"
-              --unattended
-              --replace
+        - name: Run configuration script as runner user
+          ansible.builtin.shell: |
+            set +x
+            sudo -u {{ runner_username }} -H \
+              env HOME={{ runner_home }} \
+              ./config.sh \
+                --url "{{ github_repo_config_url }}" \
+                --token "$(cat .runner_token)" \
+                --name "{{ runner_name }}" \
+                --labels "{{ runner_labels | join(',') }}" \
+                --work _work \
+                --unattended \
+                --replace
+          args:
             chdir: "{{ runner_work_dir }}"
           become: true
-          become_user: "{{ runner_username }}"
-          no_log: true
           register: runner_config_result
+          failed_when: false
+          tags: [github_runner, registration]
+
+        - name: Remove registration token file
+          ansible.builtin.file:
+            path: "{{ runner_work_dir }}/.runner_token"
+            state: absent
+          become: true
+          tags: [github_runner, registration]
+
+        - name: Fail if config.sh did not succeed
+          ansible.builtin.fail:
+            msg: |
+              config.sh failed with rc={{ runner_config_result.rc }}.
+              stdout:
+              {{ runner_config_result.stdout | default('') }}
+              stderr:
+              {{ runner_config_result.stderr | default('') }}
+          when: runner_config_result.rc | default(1) != 0
           tags: [github_runner, registration]
 
         - name: Mark runner as configured
@@ -185,11 +233,12 @@
           Error: {{ ansible_failed_result.msg | default('Unknown error') }}
           
           Troubleshooting:
-          1. Verify GitHub PAT token is valid and has required scopes
+          1. Verify GitHub PAT token is valid and has repo admin / Administration:write
           2. Verify repository URL is correct: {{ github_repo_url }}
           3. Check runner name is unique: {{ runner_name }}
-          4. Verify network connectivity to github.com
+          4. Verify the instance can reach github.com and api.github.com
           5. Check runner work directory permissions: {{ runner_work_dir }}
+          6. config.sh must run as {{ runner_username }}, not root
       no_log: false
       tags: [github_runner, error]
 
