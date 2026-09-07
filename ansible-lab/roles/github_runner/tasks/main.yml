@@ -132,7 +132,6 @@
           loop:
             - config.sh
             - run.sh
-            - svc.sh
           tags: [github_runner, registration]
 
         - name: Write registration token for config.sh
