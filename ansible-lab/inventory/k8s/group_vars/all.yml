@@ -1,9 +1,10 @@
 ---
 # Connection settings for the dedicated kubeadm inventory.
-# These override the AWS SSM defaults in inventory/group_vars/all.yml
-# because this inventory is loaded separately.
+# Semaphore reaches these EC2 nodes over AWS Systems Manager (no SSH).
 
-ansible_connection: ssh
+ansible_connection: community.aws.aws_ssm
+ansible_aws_ssm_region: us-east-1
+ansible_user: ansible
 ansible_become: true
 ansible_become_user: root
 ansible_become_method: sudo

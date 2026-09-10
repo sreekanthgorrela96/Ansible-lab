@@ -1,13 +1,13 @@
 # Kubernetes cluster nodes (Ubuntu 22.04 LTS)
 #
-# Update ansible_host / ansible_user before running the playbook.
+# ansible_host must be the EC2 instance ID for community.aws.aws_ssm.
 # Do not put the control-plane host in [k8s_workers].
 
 [k8s_control_plane]
-k8s-master ansible_host=172.31.17.188 ansible_user=ansible
+k8s-master ansible_host=i-0f86966438c1c8a6d ansible_user=ansible private_ip=172.31.17.188
 
 [k8s_workers]
-k8s-worker1 ansible_host=172.31.29.238 ansible_user=ansible
+k8s-worker1 ansible_host=i-04268ce2eeb28f9ae ansible_user=ansible private_ip=172.31.29.238
 
 [k8s_cluster:children]
 k8s_control_plane
