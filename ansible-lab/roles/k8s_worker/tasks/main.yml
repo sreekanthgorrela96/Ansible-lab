@@ -1,0 +1,29 @@
+---
+# SPDX-License-Identifier: MIT-0
+
+- name: Check whether this node already joined the cluster
+  ansible.builtin.stat:
+    path: "{{ k8s_kubelet_conf }}"
+  register: k8s_kubelet_conf_stat
+  tags: [k8s, worker]
+
+- name: Resolve the control-plane join command
+  ansible.builtin.set_fact:
+    k8s_resolved_join_command: "{{ (k8s_join_command | default('') | trim) if (k8s_join_command | default('') | trim | length > 0) else (hostvars[groups['k8s_control_plane'][0]].k8s_join_command | default('') | trim) }}"
+  tags: [k8s, worker]
+
+- name: Assert a join command is available
+  ansible.builtin.assert:
+    that:
+      - k8s_resolved_join_command | length > 0
+    fail_msg: >-
+      No kubeadm join command found. Run the control-plane play first, or pass
+      -e k8s_join_command='kubeadm join ...'
+  when: not k8s_kubelet_conf_stat.stat.exists
+  tags: [k8s, worker]
+
+- name: Join this node to the cluster
+  ansible.builtin.command:
+    cmd: "{{ k8s_resolved_join_command }} --cri-socket={{ k8s_cri_socket }}"
+  when: not k8s_kubelet_conf_stat.stat.exists
+  tags: [k8s, worker, join]

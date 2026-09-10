@@ -1,0 +1,15 @@
+---
+- name: Check whether UFW is active
+  ansible.builtin.command:
+    cmd: ufw status
+  register: k8s_ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Allow Kubernetes ports through UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] | default('tcp') }}"
+  loop: "{{ k8s_ufw_ports }}"
+  when: k8s_ufw_status.rc == 0 and 'inactive' not in (k8s_ufw_status.stdout | lower)

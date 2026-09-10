@@ -1,0 +1,13 @@
+---
+# SPDX-License-Identifier: MIT-0
+
+- name: Restart containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: true
+    daemon_reload: true
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

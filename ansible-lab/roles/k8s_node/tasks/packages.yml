@@ -1,0 +1,44 @@
+---
+- name: Download Kubernetes apt signing key (armored)
+  ansible.builtin.get_url:
+    url: "{{ k8s_pkgs_gpg_url }}"
+    dest: /tmp/kubernetes-apt-keyring.asc
+    mode: "0644"
+
+- name: Dearmor Kubernetes apt signing key
+  ansible.builtin.command:
+    cmd: gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-apt-keyring.asc
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Restrict Kubernetes keyring permissions
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Add Kubernetes apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: "{{ k8s_pkgs_apt_repo }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install kubelet, kubeadm, and kubectl
+  ansible.builtin.apt:
+    name: "{{ k8s_packages }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages to prevent accidental upgrades
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ k8s_packages }}"
+
+- name: Enable kubelet (it becomes healthy after kubeadm init or join)
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    daemon_reload: true

@@ -1,0 +1,20 @@
+---
+# Connection settings for the dedicated kubeadm inventory.
+# These override the AWS SSM defaults in inventory/group_vars/all.yml
+# because this inventory is loaded separately.
+
+ansible_connection: ssh
+ansible_become: true
+ansible_become_user: root
+ansible_become_method: sudo
+ansible_python_interpreter: /usr/bin/python3
+
+# Kubernetes
+k8s_minor_version: "1.33"
+k8s_pause_image: "registry.k8s.io/pause:3.10"
+k8s_pod_network_cidr: "192.168.0.0/16"
+k8s_service_cidr: "10.96.0.0/12"
+k8s_cni_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml"
+k8s_allow_control_plane_workloads: false
+k8s_configure_ufw: false
+k8s_fetch_kubeconfig: true

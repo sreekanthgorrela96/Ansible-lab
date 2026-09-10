@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  author: Ansible Lab
+  description: Join Ubuntu worker nodes to a kubeadm Kubernetes cluster
+  license: MIT-0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+  galaxy_tags:
+    - kubernetes
+    - kubeadm
+    - worker
+
+dependencies: []

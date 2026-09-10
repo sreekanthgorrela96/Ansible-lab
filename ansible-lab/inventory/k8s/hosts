@@ -1,0 +1,17 @@
+# Kubernetes cluster nodes (Ubuntu 22.04 LTS)
+#
+# Update ansible_host / ansible_user before running the playbook.
+# Do not put the control-plane host in [k8s_workers].
+
+[k8s_control_plane]
+k8s-master ansible_host=192.168.34.10 ansible_user=sgorrela
+
+[k8s_workers]
+k8s-worker1 ansible_host=192.168.34.236 ansible_user=sgorrela
+
+[k8s_cluster:children]
+k8s_control_plane
+k8s_workers
+
+[k8s_cluster:vars]
+ansible_python_interpreter=/usr/bin/python3
