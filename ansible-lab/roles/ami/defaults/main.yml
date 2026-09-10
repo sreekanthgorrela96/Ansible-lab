@@ -19,3 +19,10 @@ source_instance_id: "i-06f803f71a104eaf7"
 # New custom AMI
 custom_ami_name: "ansible-custom-ami"
 custom_ami_description: "AMI created from existing EC2 instance using Ansible"
+ami_no_reboot: true
+ami_wait_timeout: 1200
+ami_tags:
+  Name: "{{ custom_ami_name }}"
+  CreatedBy: Ansible
+  SourceInstance: "{{ source_instance_id }}"
+  Purpose: "{{ ami_purpose | default('GitHub Actions Runner Golden Image') }}"

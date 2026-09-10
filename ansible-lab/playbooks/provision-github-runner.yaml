@@ -106,6 +106,28 @@
       delay: 8
       tags: [always, cleanup]
     
+    - name: Find existing GitHub runner golden AMI
+      amazon.aws.ec2_ami_info:
+        region: "{{ aws_region }}"
+        owners: self
+        filters:
+          "tag:Purpose": "GitHub Actions Runner Golden Image"
+          state: available
+      register: runner_golden_amis
+      retries: 3
+      delay: 5
+      tags: [always, ami]
+
+    - name: Use latest golden AMI when present
+      ansible.builtin.set_fact:
+        ami_id: "{{ (runner_golden_amis.images | sort(attribute='creation_date') | last).image_id }}"
+        skip_tool_install: true
+        create_runner_ami: false
+      when:
+        - (runner_golden_amis.images | default([])) | length > 0
+        - not (force_create_runner_ami | default(false) | bool)
+      tags: [always, ami]
+
     - name: Display provisioning configuration
       ansible.builtin.debug:
         msg: |
@@ -124,14 +146,19 @@
             Runner Name: {{ runner_name | default('(auto-generated)') }}
             Runner Labels: {{ runner_labels | default(['self-hosted', 'linux', 'x64', 'docker', 'aws']) | join(', ') }}
           
+          Golden AMI: {{ ami_id | default('(stock AMI; tools will be installed)') }}
+          Skip tool install: {{ skip_tool_install | default(false) }}
+          Create golden AMI after tools: {{ create_runner_ami | default(true) }}
+
           This playbook will:
           1. Launch EC2 instance with IAM instance profile (no static keys)
           2. Create security group with SSH + egress rules
-          3. Wait for SSH connectivity
-          4. Install Docker, Kubernetes tools, AWS CLI v2, .NET, Maven, Node.js, Python
-          5. Register as GitHub Actions self-hosted runner
-          6. Configure systemd service for auto-restart
-          7. Display instance details and next steps
+          3. Wait for SSM connectivity
+          4. Install Docker, Kubernetes tools, AWS CLI v2, .NET, Maven, Node.js, Python (skipped when a golden AMI exists)
+          5. Create a golden AMI from the tooled instance (first run only)
+          6. Register as GitHub Actions self-hosted runner
+          7. Configure systemd service for auto-restart
+          8. Display instance details and next steps
       tags: [always, summary]
   
   roles:
@@ -222,11 +249,66 @@
         install_kubernetes_tools: true
         install_aws_cli: true
         install_build_tools: true
+      when: not (hostvars['localhost']['skip_tool_install'] | default(false) | bool)
       tags: [tools, configuration]
-    
+
+- name: Create golden AMI after tools are installed
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    ansible_connection: local
+    ansible_become: false
+    source_instance_id: "{{ runner_instance_id }}"
+    custom_ami_name: "github-runner-al2023-{{ now(utc=true, fmt='%Y%m%d%H%M%S') }}"
+    custom_ami_description: "GitHub runner golden image with Docker, AWS CLI, .NET, Java, Node, Python"
+    ami_purpose: "GitHub Actions Runner Golden Image"
+    ami_no_reboot: true
+  roles:
+    - role: ami
+      when:
+        - create_runner_ami | default(true) | bool
+        - not (skip_tool_install | default(false) | bool)
+        - runner_instance_id | default('') | length > 0
+      tags: [ami]
+
+- name: Register GitHub Actions Runner
+  hosts: github_runners
+  gather_facts: false
+  become: true
+
+  vars_files:
+    - ../inventory/group_vars/github_runners/vault.yml
+
+  vars:
+    github_repo_url: "{{ vault_github_repo_url | default('https://github.com/sreekanthgorrela96/Ansible-lab.git') }}"
+    key_pair_name: "{{ vault_ec2_key_pair_name | default('Ansikey') }}"
+    runner_username: github-runner
+    runner_home: /home/github-runner
+    runner_work_dir: /home/github-runner/runner
+    runner_labels:
+      - self-hosted
+      - linux
+      - x64
+      - docker
+      - aws
+      - "{{ runner_environment | default(environment) | default('production') }}"
+
+  pre_tasks:
+    - name: Use vault GitHub PAT when extra-vars did not provide one
+      ansible.builtin.set_fact:
+        github_pat_token: "{{ vault_github_pat_token }}"
+      when:
+        - github_pat_token | default('') | length == 0
+        - vault_github_pat_token | default('') | length > 0
+      no_log: true
+      tags: [always]
+
+  roles:
     - role: github_runner
       tags: [runner, registration]
-  
+
   post_tasks:
     - name: Display runner provisioning complete
       ansible.builtin.debug:

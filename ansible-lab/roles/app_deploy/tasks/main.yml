@@ -18,8 +18,6 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: root
-    group: root
     mode: '0755'
   loop:
     - "{{ app_root }}"
@@ -47,8 +45,6 @@
     src: "{{ app_artifact_path }}"
     dest: "{{ app_release_path }}"
     remote_src: true
-    owner: root
-    group: root
   when: app_artifact_type == 'zip'
   notify: Restart application service
 
@@ -58,8 +54,6 @@
     src: "{{ app_artifact_path }}"
     dest: "{{ app_release_path }}/{{ app_name }}.jar"
     remote_src: true
-    owner: root
-    group: root
     mode: '0644'
   when: app_artifact_type == 'jar'
   notify: Restart application service
@@ -69,6 +63,13 @@
   ansible.builtin.template:
     src: application.yml.j2
     dest: "{{ app_config_path }}"
+    mode: '0644'
+  notify: Restart application service
+
+- name: Render application systemd service
+  ansible.builtin.template:
+    src: app.service.j2
+    dest: "/etc/systemd/system/{{ app_service_name }}.service"
     owner: root
     group: root
     mode: '0644'

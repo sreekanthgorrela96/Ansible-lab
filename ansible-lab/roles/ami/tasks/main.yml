@@ -1,18 +1,38 @@
 ---
-- name: Create AMI from existing EC2 instance
-  amazon.aws.ec2_ami:
-    instance_id: "{{ source_instance_id }}"
-    name: "{{ custom_ami_name }}"
-    description: "{{ custom_ami_description }}"
-    region: "{{ aws_region }}"
-    wait: true
-    state: present
-    tags:
-      Name: "{{ custom_ami_name }}"
-      CreatedBy: "Ansible"
-      SourceInstance: "{{ source_instance_id }}"
-  register: ami_result
+# SPDX-License-Identifier: MIT-0
+# Create an AMI from a running EC2 instance (AWS API, localhost).
 
-- name: Display created AMI ID
-  ansible.builtin.debug:
-    msg: "AMI created successfully: {{ ami_result.image_id }}"
+- name: Create AMI from existing EC2 instance
+  block:
+    - name: Assert source instance id is set
+      ansible.builtin.assert:
+        that:
+          - source_instance_id | default('') | length > 0
+        fail_msg: "source_instance_id is required to create an AMI."
+
+    - name: Create AMI from existing EC2 instance
+      amazon.aws.ec2_ami:
+        instance_id: "{{ source_instance_id }}"
+        name: "{{ custom_ami_name }}"
+        description: "{{ custom_ami_description }}"
+        region: "{{ aws_region }}"
+        wait: true
+        wait_timeout: "{{ ami_wait_timeout }}"
+        no_reboot: "{{ ami_no_reboot }}"
+        state: present
+        tags: "{{ ami_tags }}"
+      register: ami_result
+      retries: 3
+      delay: 15
+      until: ami_result is succeeded
+
+    - name: Display created AMI ID
+      ansible.builtin.debug:
+        msg: "AMI created successfully: {{ ami_result.image_id }}"
+
+  rescue:
+    - name: Log AMI creation failure
+      ansible.builtin.debug:
+        msg: |
+          AMI creation failed; continuing without a golden image.
+          {{ ansible_failed_result.msg | default(ansible_failed_result) }}
