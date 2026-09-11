@@ -26,7 +26,7 @@
 
 - name: Join this node to the cluster
   ansible.builtin.command:
-    cmd: "{{ k8s_resolved_join_command }} --cri-socket={{ k8s_cri_socket }}"
+    cmd: "{{ k8s_resolved_join_command }} --cri-socket={{ k8s_cri_socket }}{{ (' --ignore-preflight-errors=' + k8s_kubeadm_ignore_preflight_errors) if (k8s_kubeadm_ignore_preflight_errors | default('') | length > 0) else '' }}"
   when:
     - not k8s_kubelet_conf_stat.stat.exists
     - not ansible_check_mode

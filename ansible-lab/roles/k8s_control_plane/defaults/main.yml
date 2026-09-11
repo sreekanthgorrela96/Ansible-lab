@@ -20,3 +20,6 @@ k8s_api_wait_retries: 36
 k8s_api_wait_delay: 5
 k8s_cni_wait_retries: 36
 k8s_cni_wait_delay: 10
+
+# Lab t3.micro nodes have ~1 GiB RAM; kubeadm requires 1700 MiB.
+k8s_kubeadm_ignore_preflight_errors: Mem

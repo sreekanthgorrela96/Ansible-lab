@@ -15,6 +15,7 @@
       --service-cidr={{ k8s_service_cidr }}
       --cri-socket={{ k8s_cri_socket }}
       --upload-certs
+      {{ ('--ignore-preflight-errors=' + k8s_kubeadm_ignore_preflight_errors) if (k8s_kubeadm_ignore_preflight_errors | default('') | length > 0) else '' }}
   register: k8s_kubeadm_init
   when: not k8s_admin_conf.stat.exists
   tags: [k8s, control_plane, init]

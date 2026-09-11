@@ -4,3 +4,4 @@
 k8s_cri_socket: "unix:///run/containerd/containerd.sock"
 k8s_kubelet_conf: /etc/kubernetes/kubelet.conf
 k8s_join_command: ""
+k8s_kubeadm_ignore_preflight_errors: Mem
