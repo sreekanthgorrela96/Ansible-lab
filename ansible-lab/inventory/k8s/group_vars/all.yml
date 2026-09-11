@@ -2,14 +2,13 @@
 # Connection settings for the dedicated kubeadm inventory.
 # Semaphore reaches these EC2 nodes over AWS Systems Manager (no SSH).
 
-ansible_connection: community.aws.aws_ssm
+ansible_connection: amazon.aws.aws_ssm
 ansible_aws_ssm_region: us-east-1
 ansible_aws_ssm_bucket_name: ansible-lab-artifacts-422836431778-960c3c49
 ansible_aws_ssm_bucket_region: us-east-1
-ansible_user: ansible
-ansible_become: true
-ansible_become_user: root
-ansible_become_method: sudo
+ansible_aws_ssm_document: AnsibleSSMElevatedShell
+ansible_user: root
+ansible_become: false
 ansible_python_interpreter: /usr/bin/python3
 
 # Kubernetes
