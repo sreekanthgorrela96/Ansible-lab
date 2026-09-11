@@ -1,4 +1,4 @@
-# Kubernetes cluster nodes (Ubuntu 22.04 LTS)
+# Kubernetes cluster nodes (Ubuntu 26.04)
 #
 # ansible_host must be the EC2 instance ID for community.aws.aws_ssm.
 # Do not put the control-plane host in [k8s_workers].

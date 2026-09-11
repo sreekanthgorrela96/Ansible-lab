@@ -1,6 +1,6 @@
-# Kubernetes Cluster Setup (Ubuntu 22.04 LTS)
+# Kubernetes Cluster Setup (Ubuntu 26.04)
 
-Ansible playbook and roles that build a kubeadm cluster with containerd and Calico. The flow follows the Ubuntu 22.04 tutorial, with the command and CNI mistakes from that PDF corrected.
+Ansible playbook and roles that build a kubeadm cluster with containerd and Calico. The flow follows the Ubuntu kubeadm tutorial, with the command and CNI mistakes from that PDF corrected.
 
 ## What this creates
 
@@ -36,7 +36,7 @@ ansible-galaxy collection install -r collections/requirements.yml
 
 On every cluster node:
 
-- Ubuntu 22.04 LTS
+- Ubuntu 26.04
 - SSH access and passwordless (or become) sudo
 - Unique hostname (the role sets hostname to `inventory_hostname`)
 - Control plane: at least 2 CPUs and 2 GiB RAM

@@ -1,6 +1,6 @@
 ---
 # SPDX-License-Identifier: MIT-0
-# Shared node prep for kubeadm (Ubuntu 22.04 LTS).
+# Shared node prep for kubeadm (Ubuntu 26.04).
 
 k8s_minor_version: "1.33"
 k8s_pause_image: "registry.k8s.io/pause:3.10"

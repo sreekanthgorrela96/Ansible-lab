@@ -7,7 +7,7 @@ galaxy_info:
   platforms:
     - name: Ubuntu
       versions:
-        - jammy
+        - resolute
   galaxy_tags:
     - kubernetes
     - kubeadm
