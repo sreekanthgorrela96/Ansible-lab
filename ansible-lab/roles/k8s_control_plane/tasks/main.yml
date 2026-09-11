@@ -20,14 +20,23 @@
   when: not k8s_admin_conf.stat.exists
   tags: [k8s, control_plane, init]
 
-- name: Create kubeconfig directory for the deploying user
+- name: Create kubeconfig directory for root
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: /root/.kube
     state: directory
-    owner: "{{ 'root' if k8s_kubeconfig_user == 'root' else k8s_kubeconfig_user }}"
-    group: "{{ 'root' if k8s_kubeconfig_user == 'root' else k8s_kubeconfig_user }}"
+    owner: root
+    group: root
     mode: "0755"
-  loop: "{{ ['/root/.kube'] + ([] if k8s_kubeconfig_user == 'root' else ['/home/' ~ k8s_kubeconfig_user ~ '/.kube']) }}"
+  tags: [k8s, control_plane]
+
+- name: Create kubeconfig directories for login users
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.kube"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0755"
+  loop: "{{ k8s_kubeconfig_users | default([]) | reject('equalto', 'root') | list }}"
   tags: [k8s, control_plane]
 
 - name: Install admin kubeconfig for root
@@ -41,17 +50,16 @@
   when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane]
 
-- name: Install admin kubeconfig for the deploying user
+- name: Install admin kubeconfig for login users
   ansible.builtin.copy:
     src: "{{ k8s_admin_kubeconfig }}"
-    dest: "/home/{{ k8s_kubeconfig_user }}/.kube/config"
+    dest: "/home/{{ item }}/.kube/config"
     remote_src: true
-    owner: "{{ k8s_kubeconfig_user }}"
-    group: "{{ k8s_kubeconfig_user }}"
+    owner: "{{ item }}"
+    group: "{{ item }}"
     mode: "0600"
-  when:
-    - k8s_kubeconfig_user != "root"
-    - not ansible_check_mode or k8s_admin_conf.stat.exists
+  loop: "{{ k8s_kubeconfig_users | default([]) | reject('equalto', 'root') | list }}"
+  when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane]
 
 - name: Wait until the Kubernetes API is ready
