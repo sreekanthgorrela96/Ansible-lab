@@ -23,12 +23,10 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ k8s_kubeconfig_user }}"
-    group: "{{ k8s_kubeconfig_user }}"
+    owner: "{{ 'root' if k8s_kubeconfig_user == 'root' else k8s_kubeconfig_user }}"
+    group: "{{ 'root' if k8s_kubeconfig_user == 'root' else k8s_kubeconfig_user }}"
     mode: "0755"
-  loop:
-    - "/home/{{ k8s_kubeconfig_user }}/.kube"
-    - /root/.kube
+  loop: "{{ ['/root/.kube'] + ([] if k8s_kubeconfig_user == 'root' else ['/home/' ~ k8s_kubeconfig_user ~ '/.kube']) }}"
   tags: [k8s, control_plane]
 
 - name: Install admin kubeconfig for root
@@ -39,6 +37,7 @@
     owner: root
     group: root
     mode: "0600"
+  when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane]
 
 - name: Install admin kubeconfig for the deploying user
@@ -49,6 +48,9 @@
     owner: "{{ k8s_kubeconfig_user }}"
     group: "{{ k8s_kubeconfig_user }}"
     mode: "0600"
+  when:
+    - k8s_kubeconfig_user != "root"
+    - not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane]
 
 - name: Wait until the Kubernetes API is ready
@@ -59,6 +61,7 @@
   delay: "{{ k8s_api_wait_delay }}"
   until: k8s_api_ready.rc == 0
   changed_when: false
+  when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane]
 
 - name: Download Calico manifest
@@ -73,6 +76,7 @@
     cmd: kubectl --kubeconfig={{ k8s_admin_kubeconfig }} apply -f {{ k8s_cni_manifest_path }}
   register: k8s_cni_apply
   changed_when: "'configured' in k8s_cni_apply.stdout or 'created' in k8s_cni_apply.stdout"
+  when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane, cni]
 
 - name: Wait until Calico pods are ready
@@ -88,6 +92,7 @@
   delay: "{{ k8s_cni_wait_delay }}"
   until: k8s_calico_wait.rc == 0
   changed_when: false
+  when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane, cni]
 
 - name: Allow workloads on the control plane when requested
@@ -95,7 +100,9 @@
     cmd: >-
       kubectl --kubeconfig={{ k8s_admin_kubeconfig }}
       taint nodes {{ inventory_hostname }} node-role.kubernetes.io/control-plane:NoSchedule-
-  when: k8s_allow_control_plane_workloads | bool
+  when:
+    - k8s_allow_control_plane_workloads | bool
+    - not ansible_check_mode or k8s_admin_conf.stat.exists
   register: k8s_untaint
   changed_when: k8s_untaint.rc == 0
   failed_when: false
@@ -106,11 +113,13 @@
     cmd: kubeadm token create --print-join-command --ttl {{ k8s_join_token_ttl }}
   register: k8s_join_cmd
   changed_when: true
+  when: not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane, join]
 
 - name: Publish join command for worker plays
   ansible.builtin.set_fact:
     k8s_join_command: "{{ k8s_join_cmd.stdout | trim }}"
+  when: k8s_join_cmd is defined and k8s_join_cmd.stdout is defined
   tags: [k8s, control_plane, join]
 
 - name: Fetch kubeconfig to the Ansible controller
@@ -118,5 +127,7 @@
     src: "{{ k8s_admin_kubeconfig }}"
     dest: "{{ k8s_fetch_kubeconfig_dest }}/{{ inventory_hostname }}.conf"
     flat: true
-  when: k8s_fetch_kubeconfig | bool
+  when:
+    - k8s_fetch_kubeconfig | bool
+    - not ansible_check_mode or k8s_admin_conf.stat.exists
   tags: [k8s, control_plane]

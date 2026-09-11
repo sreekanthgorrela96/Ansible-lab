@@ -16,6 +16,7 @@
     owner: root
     group: root
     mode: "0644"
+  when: not ansible_check_mode
 
 - name: Add Docker apt repository for containerd.io
   ansible.builtin.copy:
@@ -45,6 +46,7 @@
   register: k8s_containerd_default
   changed_when: false
   check_mode: false
+  when: not ansible_check_mode
 
 - name: Write containerd config with systemd cgroup and matching pause image
   ansible.builtin.copy:
@@ -59,6 +61,10 @@
         | regex_replace('sandbox_image = ".*"', 'sandbox_image = "' + k8s_pause_image + '"')
       }}
   notify: Restart containerd
+  when:
+    - k8s_containerd_default is defined
+    - k8s_containerd_default.stdout is defined
+    - k8s_containerd_default.stdout | length > 0
 
 - name: Enable and start containerd
   ansible.builtin.systemd:
@@ -66,3 +72,4 @@
     state: started
     enabled: true
     daemon_reload: true
+  when: not ansible_check_mode

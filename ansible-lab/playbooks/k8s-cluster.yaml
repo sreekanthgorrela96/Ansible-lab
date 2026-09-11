@@ -43,15 +43,23 @@
         cmd: kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o wide
       register: k8s_nodes
       changed_when: false
+      when: not ansible_check_mode
 
     - name: List kube-system pods
       ansible.builtin.command:
         cmd: kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods -A -o wide
       register: k8s_pods
       changed_when: false
+      when: not ansible_check_mode
 
     - name: Show cluster status
       ansible.builtin.debug:
         msg:
           - "{{ k8s_nodes.stdout_lines }}"
           - "{{ k8s_pods.stdout_lines }}"
+      when: not ansible_check_mode
+
+    - name: Skip live cluster verification in check mode
+      ansible.builtin.debug:
+        msg: Check mode does not query the Kubernetes API because kubeadm init is not applied.
+      when: ansible_check_mode

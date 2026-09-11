@@ -19,11 +19,15 @@
     fail_msg: >-
       No kubeadm join command found. Run the control-plane play first, or pass
       -e k8s_join_command='kubeadm join ...'
-  when: not k8s_kubelet_conf_stat.stat.exists
+  when:
+    - not k8s_kubelet_conf_stat.stat.exists
+    - not ansible_check_mode
   tags: [k8s, worker]
 
 - name: Join this node to the cluster
   ansible.builtin.command:
     cmd: "{{ k8s_resolved_join_command }} --cri-socket={{ k8s_cri_socket }}"
-  when: not k8s_kubelet_conf_stat.stat.exists
+  when:
+    - not k8s_kubelet_conf_stat.stat.exists
+    - not ansible_check_mode
   tags: [k8s, worker, join]

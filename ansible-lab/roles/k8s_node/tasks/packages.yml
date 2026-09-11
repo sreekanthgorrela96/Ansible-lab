@@ -16,6 +16,7 @@
     owner: root
     group: root
     mode: "0644"
+  when: not ansible_check_mode
 
 - name: Add Kubernetes apt repository
   ansible.builtin.copy:
@@ -36,9 +37,11 @@
     name: "{{ item }}"
     selection: hold
   loop: "{{ k8s_packages }}"
+  when: not ansible_check_mode
 
 - name: Enable kubelet (it becomes healthy after kubeadm init or join)
   ansible.builtin.systemd:
     name: kubelet
     enabled: true
     daemon_reload: true
+  when: not ansible_check_mode
