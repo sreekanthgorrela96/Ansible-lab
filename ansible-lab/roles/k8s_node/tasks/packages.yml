@@ -34,11 +34,25 @@
   failed_when: false
   when: not ansible_check_mode
 
+- name: Refresh only the Kubernetes apt repository
+  ansible.builtin.command:
+    cmd: >-
+      apt-get update
+      -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/kubernetes.list
+      -o Dir::Etc::sourceparts=-
+      -o APT::Get::List-Cleanup=0
+  register: k8s_pkgs_apt_update
+  retries: 5
+  delay: 10
+  until: k8s_pkgs_apt_update.rc == 0
+  changed_when: true
+  when: not ansible_check_mode
+
 - name: Install kubelet, kubeadm, and kubectl from the selected channel
   ansible.builtin.apt:
     name: "{{ k8s_packages }}"
     state: latest
-    update_cache: true
+    update_cache: false
     lock_timeout: 180
   register: k8s_pkgs_apt
   retries: 5
