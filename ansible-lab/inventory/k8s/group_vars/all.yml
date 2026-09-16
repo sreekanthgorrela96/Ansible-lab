@@ -1,25 +1,23 @@
 ---
-# Connection settings for the dedicated kubeadm inventory.
-# Semaphore reaches these EC2 nodes over AWS Systems Manager (no SSH).
+# Connection settings for the on-prem kubeadm inventory (SSH + sudo).
+# Do not inherit the AWS SSM defaults used by the dynamic EC2 inventory.
 
-ansible_connection: amazon.aws.aws_ssm
-ansible_aws_ssm_region: us-east-1
-ansible_aws_ssm_bucket_name: ansible-lab-artifacts-422836431778-960c3c49
-ansible_aws_ssm_bucket_region: us-east-1
-ansible_aws_ssm_document: AnsibleSSMElevatedShell
-ansible_user: root
-ansible_become: false
+ansible_connection: ssh
+ansible_user: sgorrela
+ansible_become: true
+ansible_become_user: root
 ansible_python_interpreter: /usr/bin/python3
 
 # Kubernetes
-k8s_minor_version: "1.33"
+k8s_minor_version: "1.37"
 k8s_pause_image: "registry.k8s.io/pause:3.10"
-k8s_pod_network_cidr: "192.168.0.0/16"
+# LAN is 192.168.34.0/24; Calico's default 192.168.0.0/16 would overlap.
+k8s_pod_network_cidr: "10.244.0.0/16"
 k8s_service_cidr: "10.96.0.0/12"
 k8s_cni_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml"
 k8s_allow_control_plane_workloads: false
-k8s_configure_ufw: false
+k8s_configure_ufw: true
 k8s_fetch_kubeconfig: true
-k8s_kubeadm_ignore_preflight_errors: Mem
+k8s_kubeadm_ignore_preflight_errors: ""
 k8s_kubeconfig_users:
-  - ubuntu
+  - sgorrela

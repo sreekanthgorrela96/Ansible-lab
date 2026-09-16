@@ -1,15 +1,38 @@
 ---
 # SPDX-License-Identifier: MIT-0
 
-- name: Assert Ubuntu 26.04
+- name: Assert Ubuntu 22.04 or newer
   ansible.builtin.assert:
     that:
       - ansible_os_family == "Debian"
       - ansible_distribution == "Ubuntu"
-      - ansible_distribution_major_version == "26"
-    fail_msg: "This role targets Ubuntu 26.04. Detected {{ ansible_distribution }} {{ ansible_distribution_version }}."
+      - ansible_distribution_major_version is version('22', '>=')
+    fail_msg: "This role targets Ubuntu 22.04 or newer. Detected {{ ansible_distribution }} {{ ansible_distribution_version }}."
     success_msg: "Host {{ inventory_hostname }} is Ubuntu {{ ansible_distribution_version }}."
   tags: [k8s, node, Always]
+
+- name: Check leftover kubelet configuration
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: k8s_existing_kubelet_conf
+  tags: [k8s, node]
+
+- name: Check whether the control plane is already initialized
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['k8s_control_plane'][0] }}"
+  register: k8s_cp_admin_conf
+  tags: [k8s, node]
+
+- name: Reset leftover kubeadm on workers before a new control-plane init
+  ansible.builtin.command:
+    cmd: kubeadm reset -f
+  when:
+    - inventory_hostname in (groups['k8s_workers'] | default([]))
+    - k8s_existing_kubelet_conf.stat.exists | default(false)
+    - not (k8s_cp_admin_conf.stat.exists | default(false))
+    - not ansible_check_mode
+  tags: [k8s, node]
 
 - name: Set hostname to the inventory name
   ansible.builtin.hostname:

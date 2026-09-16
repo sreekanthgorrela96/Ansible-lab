@@ -1,13 +1,14 @@
-# Kubernetes cluster nodes (Ubuntu 26.04)
+# Kubernetes cluster nodes (on-prem Ubuntu)
 #
-# ansible_host must be the EC2 instance ID for community.aws.aws_ssm.
+# Master: 192.168.34.240 (Semaphore UI host)
+# Worker: 192.168.34.236
 # Do not put the control-plane host in [k8s_workers].
 
 [k8s_control_plane]
-k8s-master ansible_host=i-0f86966438c1c8a6d ansible_aws_ssm_instance_id=i-0f86966438c1c8a6d ansible_user=ansible private_ip=172.31.17.188
+k8s-master ansible_host=192.168.34.240 ansible_user=sgorrela
 
 [k8s_workers]
-k8s-worker1 ansible_host=i-04268ce2eeb28f9ae ansible_aws_ssm_instance_id=i-04268ce2eeb28f9ae ansible_user=ansible private_ip=172.31.29.238
+k8s-worker1 ansible_host=192.168.34.236 ansible_user=sgorrela
 
 [k8s_cluster:children]
 k8s_control_plane
@@ -15,3 +16,6 @@ k8s_workers
 
 [k8s_cluster:vars]
 ansible_python_interpreter=/usr/bin/python3
+ansible_connection=ssh
+ansible_become=true
+ansible_become_user=root

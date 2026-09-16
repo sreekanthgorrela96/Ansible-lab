@@ -1,9 +1,16 @@
 ---
 # SPDX-License-Identifier: MIT-0
-# Shared node prep for kubeadm (Ubuntu 26.04).
+# Shared node prep for kubeadm (Ubuntu 22.04+).
 
 k8s_minor_version: "1.33"
 k8s_pause_image: "registry.k8s.io/pause:3.10"
+
+k8s_cri_socket_containerd: "unix:///run/containerd/containerd.sock"
+k8s_cri_dockerd_socket: "unix:///var/run/cri-dockerd.sock"
+k8s_cri_dockerd_version: "0.3.26"
+k8s_cri_dockerd_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+k8s_cri_dockerd_tarball: "https://github.com/Mirantis/cri-dockerd/releases/download/v{{ k8s_cri_dockerd_version }}/cri-dockerd-{{ k8s_cri_dockerd_version }}.{{ k8s_cri_dockerd_arch }}.tgz"
+k8s_use_cri_dockerd: false
 
 k8s_docker_gpg_url: "https://download.docker.com/linux/ubuntu/gpg"
 k8s_docker_apt_repo: "deb [arch={{ k8s_apt_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"

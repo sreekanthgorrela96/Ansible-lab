@@ -33,6 +33,33 @@
     update_cache: true
   when: not ansible_check_mode
 
+- name: Check whether Docker is already running on this host
+  ansible.builtin.command:
+    cmd: systemctl is-active docker
+  register: k8s_docker_active
+  changed_when: false
+  failed_when: false
+
+- name: Check whether containerd CRI is disabled (Docker-owned runtime)
+  ansible.builtin.command:
+    cmd: grep -E 'disabled_plugins.*cri' /etc/containerd/config.toml
+  register: k8s_cri_disabled
+  changed_when: false
+  failed_when: false
+
+- name: Use cri-dockerd when Docker already owns containerd
+  ansible.builtin.set_fact:
+    k8s_use_cri_dockerd: "{{ k8s_docker_active.rc == 0 and k8s_cri_disabled.rc == 0 }}"
+
+- name: Set CRI socket for cri-dockerd
+  ansible.builtin.set_fact:
+    k8s_cri_socket: "{{ k8s_cri_dockerd_socket }}"
+  when: k8s_use_cri_dockerd | bool
+
+- name: Install cri-dockerd so kubeadm does not replace Docker's containerd
+  ansible.builtin.include_tasks: cri_dockerd.yml
+  when: k8s_use_cri_dockerd | bool
+
 - name: Ensure containerd config directory exists
   ansible.builtin.file:
     path: /etc/containerd
@@ -40,6 +67,7 @@
     owner: root
     group: root
     mode: "0755"
+  when: not (k8s_use_cri_dockerd | bool)
 
 - name: Generate default containerd configuration
   ansible.builtin.command:
@@ -47,7 +75,9 @@
   register: k8s_containerd_default
   changed_when: false
   check_mode: false
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - not (k8s_use_cri_dockerd | bool)
 
 - name: Write containerd config with systemd cgroup and matching pause image
   ansible.builtin.copy:
@@ -63,6 +93,7 @@
       }}
   notify: Restart containerd
   when:
+    - not (k8s_use_cri_dockerd | bool)
     - k8s_containerd_default is defined
     - k8s_containerd_default.stdout is defined
     - k8s_containerd_default.stdout | length > 0
@@ -73,4 +104,6 @@
     state: started
     enabled: true
     daemon_reload: true
-  when: not ansible_check_mode
+  when:
+    - not ansible_check_mode
+    - not (k8s_use_cri_dockerd | bool)

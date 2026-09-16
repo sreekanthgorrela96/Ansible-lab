@@ -1,4 +1,4 @@
-# Kubernetes Cluster Setup (Ubuntu 26.04)
+# Kubernetes Cluster Setup (Ubuntu 22.04+)
 
 Ansible playbook and roles that build a kubeadm cluster with containerd and Calico. The flow follows the Ubuntu kubeadm tutorial, with the command and CNI mistakes from that PDF corrected.
 
@@ -19,8 +19,9 @@ Fixes versus the original PDF:
 - containerd `SystemdCgroup = true` and a pause image that matches kubeadm
 - `kubeadm init --pod-network-cidr=192.168.0.0/16` before Calico
 - Live `kubeadm token create --print-join-command` (no copied sample token/hash)
-- Kubernetes 1.33 from `pkgs.k8s.io` (1.29 in the PDF is end-of-life)
-- Calico v3.28.2 instead of v3.25.0
+- Kubernetes 1.37 from `pkgs.k8s.io` (1.29 in the PDF is end-of-life)
+- Calico v3.28.2 instead of v3.25.0, with pod CIDR `10.244.0.0/16` so it does not overlap the `192.168.34.0/24` LAN
+- cri-dockerd when Docker is already running (keeps Semaphore/Jenkins containers intact)
 - kubelet enabled; cluster verified with nodes and kube-system pods
 
 ## Prerequisites
@@ -36,12 +37,12 @@ ansible-galaxy collection install -r collections/requirements.yml
 
 On every cluster node:
 
-- Ubuntu 26.04
+- Ubuntu 22.04 or newer (this lab uses 26.04 on the control plane and 22.04 on the worker)
 - SSH access and passwordless (or become) sudo
 - Unique hostname (the role sets hostname to `inventory_hostname`)
 - Control plane: at least 2 CPUs and 2 GiB RAM
 - Full L3 connectivity between nodes
-- Pod CIDR `192.168.0.0/16` must **not** overlap your LAN. If your lab is already on 192.168.0.0/16, change `k8s_pod_network_cidr` in inventory before you run.
+- Pod CIDR `10.244.0.0/16` must **not** overlap your LAN. The previous Calico default `192.168.0.0/16` overlaps `192.168.34.0/24`.
 
 Required ports (open them, or set `k8s_configure_ufw: true` if UFW is active):
 
@@ -61,7 +62,7 @@ File: `ansible-lab/inventory/k8s/hosts`
 
 ```ini
 [k8s_control_plane]
-k8s-master ansible_host=192.168.34.10 ansible_user=sgorrela
+k8s-master ansible_host=192.168.34.240 ansible_user=sgorrela
 
 [k8s_workers]
 k8s-worker1 ansible_host=192.168.34.236 ansible_user=sgorrela
@@ -140,9 +141,9 @@ Override in `inventory/k8s/group_vars/all.yml` or with `-e`.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `k8s_minor_version` | `1.33` | `pkgs.k8s.io` channel (`v1.33`, `v1.34`, …) |
-| `k8s_pause_image` | `registry.k8s.io/pause:3.10` | containerd sandbox image |
-| `k8s_pod_network_cidr` | `192.168.0.0/16` | Must match Calico |
+| `k8s_minor_version` | `1.37` | `pkgs.k8s.io` channel (`v1.33`, `v1.34`, …) |
+| `k8s_pause_image` | `registry.k8s.io/pause:3.10` | containerd/cri-dockerd sandbox image |
+| `k8s_pod_network_cidr` | `10.244.0.0/16` | Must match Calico and must not overlap the LAN |
 | `k8s_service_cidr` | `10.96.0.0/12` | ClusterIP range |
 | `k8s_cni_manifest_url` | Calico v3.28.2 manifest | CNI install URL |
 | `k8s_allow_control_plane_workloads` | `false` | Untaint control plane for single-node labs |
@@ -167,7 +168,7 @@ Template type: Ansible playbook.
 |---|---|
 | Playbook | `ansible-lab/playbooks/k8s-cluster.yaml` |
 | Inventory | `ansible-lab/inventory/k8s/hosts` (or a Semaphore static inventory with the same groups) |
-| Extra args | `-e ansible_connection=ssh -e ansible_become=true -e ansible_become_user=root` |
+| Extra args | `-e ansible_connection=ssh -e ansible_user=sgorrela -e ansible_become=true -e ansible_become_user=root -e k8s_minor_version=1.37` |
 
 Use a dry-run / check-mode prompt only for the node-prep tags. Do not expect `--check` to initialize a cluster.
 

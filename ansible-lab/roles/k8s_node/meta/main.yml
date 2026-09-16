@@ -1,12 +1,14 @@
 ---
 galaxy_info:
   author: Ansible Lab
-  description: Prepare Ubuntu nodes for a kubeadm Kubernetes cluster (swap, sysctl, containerd, kubeadm)
+  description: Prepare Ubuntu nodes for a kubeadm Kubernetes cluster (swap, sysctl, containerd or cri-dockerd, kubeadm)
   license: MIT-0
   min_ansible_version: "2.14"
   platforms:
     - name: Ubuntu
       versions:
+        - jammy
+        - noble
         - resolute
   galaxy_tags:
     - kubernetes

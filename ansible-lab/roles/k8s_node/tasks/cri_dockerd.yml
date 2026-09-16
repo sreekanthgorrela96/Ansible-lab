@@ -1,0 +1,57 @@
+---
+- name: Download cri-dockerd
+  ansible.builtin.get_url:
+    url: "{{ k8s_cri_dockerd_tarball }}"
+    dest: "/tmp/cri-dockerd-{{ k8s_cri_dockerd_version }}.{{ k8s_cri_dockerd_arch }}.tgz"
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Extract cri-dockerd
+  ansible.builtin.unarchive:
+    src: "/tmp/cri-dockerd-{{ k8s_cri_dockerd_version }}.{{ k8s_cri_dockerd_arch }}.tgz"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/cri-dockerd/cri-dockerd
+  when: not ansible_check_mode
+
+- name: Install cri-dockerd binary
+  ansible.builtin.copy:
+    src: /tmp/cri-dockerd/cri-dockerd
+    dest: /usr/local/bin/cri-dockerd
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Install cri-docker systemd socket
+  ansible.builtin.template:
+    src: cri-docker.socket.j2
+    dest: /etc/systemd/system/cri-docker.socket
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install cri-docker systemd service
+  ansible.builtin.template:
+    src: cri-docker.service.j2
+    dest: /etc/systemd/system/cri-docker.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Apply systemd unit changes for cri-dockerd
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start cri-dockerd
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  loop:
+    - cri-docker.socket
+    - cri-docker.service
+  when: not ansible_check_mode

@@ -7,6 +7,8 @@ galaxy_info:
   platforms:
     - name: Ubuntu
       versions:
+        - jammy
+        - noble
         - resolute
   galaxy_tags:
     - kubernetes

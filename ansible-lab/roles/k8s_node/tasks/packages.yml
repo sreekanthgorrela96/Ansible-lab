@@ -26,10 +26,18 @@
     group: root
     mode: "0644"
 
-- name: Install kubelet, kubeadm, and kubectl
+- name: Unhold Kubernetes packages so the selected channel can install
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop: "{{ k8s_packages }}"
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Install kubelet, kubeadm, and kubectl from the selected channel
   ansible.builtin.apt:
     name: "{{ k8s_packages }}"
-    state: present
+    state: latest
     update_cache: true
   when: not ansible_check_mode
 
