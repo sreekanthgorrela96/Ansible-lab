@@ -25,8 +25,17 @@
   tags: [k8s, node]
 
 - name: Reset leftover kubeadm on workers before a new control-plane init
-  ansible.builtin.command:
-    cmd: kubeadm reset -f
+  ansible.builtin.shell: |
+    set -e
+    if command -v kubeadm >/dev/null 2>&1; then
+      kubeadm reset -f --cri-socket unix:///var/run/containerd/containerd.sock \
+        || kubeadm reset -f --cri-socket unix:///var/run/crio/crio.sock \
+        || kubeadm reset -f --cri-socket unix:///var/run/cri-dockerd.sock \
+        || true
+    fi
+    rm -rf /etc/kubernetes /var/lib/etcd
+  args:
+    executable: /bin/bash
   when:
     - inventory_hostname in (groups['k8s_workers'] | default([]))
     - k8s_existing_kubelet_conf.stat.exists | default(false)
