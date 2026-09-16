@@ -78,13 +78,14 @@
     url: "{{ k8s_cni_manifest_url }}"
     dest: "{{ k8s_cni_manifest_path }}"
     mode: "0644"
+    force: true
   tags: [k8s, control_plane, cni]
 
 - name: Align Calico IPv4 pool with kubeadm pod CIDR
   ansible.builtin.replace:
     path: "{{ k8s_cni_manifest_path }}"
-    regexp: '# - name: CALICO_IPV4POOL_CIDR\n(\s+)#(\s+)value: "192\.168\.0\.0/16"'
-    replace: '- name: CALICO_IPV4POOL_CIDR\n\1 \2value: "{{ k8s_pod_network_cidr }}"'
+    regexp: '(\s*)# - name: CALICO_IPV4POOL_CIDR\n\s*#\s*value: "192\.168\.0\.0/16"'
+    replace: '\1- name: CALICO_IPV4POOL_CIDR\n\1  value: "{{ k8s_pod_network_cidr }}"'
   tags: [k8s, control_plane, cni]
 
 - name: Apply Calico CNI

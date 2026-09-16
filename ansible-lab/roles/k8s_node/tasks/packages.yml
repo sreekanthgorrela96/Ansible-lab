@@ -39,6 +39,11 @@
     name: "{{ k8s_packages }}"
     state: latest
     update_cache: true
+    lock_timeout: 180
+  register: k8s_pkgs_apt
+  retries: 5
+  delay: 15
+  until: k8s_pkgs_apt is succeeded
   when: not ansible_check_mode
 
 - name: Hold Kubernetes packages to prevent accidental upgrades

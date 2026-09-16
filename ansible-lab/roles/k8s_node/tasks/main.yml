@@ -108,6 +108,11 @@
     name: "{{ k8s_prereq_packages }}"
     state: present
     update_cache: true
+    lock_timeout: 180
+  register: k8s_prereq_apt
+  retries: 5
+  delay: 15
+  until: k8s_prereq_apt is succeeded
   tags: [k8s, node, packages]
 
 - name: Ensure apt keyrings directory exists
