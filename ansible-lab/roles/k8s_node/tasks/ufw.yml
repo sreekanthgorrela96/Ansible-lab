@@ -13,3 +13,9 @@
     proto: "{{ item.split('/')[1] | default('tcp') }}"
   loop: "{{ k8s_ufw_ports }}"
   when: k8s_ufw_status.rc == 0 and 'inactive' not in (k8s_ufw_status.stdout | lower)
+
+- name: Allow packet forwarding for the CNI
+  community.general.ufw:
+    default: allow
+    direction: routed
+  when: k8s_ufw_status.rc == 0 and 'inactive' not in (k8s_ufw_status.stdout | lower)

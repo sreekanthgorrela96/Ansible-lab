@@ -24,9 +24,38 @@
     - not ansible_check_mode
   tags: [k8s, worker]
 
+- name: Restart cri-dockerd before join when Docker owns the runtime
+  ansible.builtin.systemd:
+    name: cri-docker.service
+    state: restarted
+  when:
+    - not k8s_kubelet_conf_stat.stat.exists
+    - not ansible_check_mode
+    - "'cri-dockerd.sock' in (k8s_cri_socket | default(''))"
+  tags: [k8s, worker, join]
+
+- name: Wait until the CRI endpoint answers
+  ansible.builtin.command:
+    cmd: crictl --runtime-endpoint {{ k8s_cri_socket }} info
+  register: k8s_cri_info
+  retries: 12
+  delay: 5
+  until: k8s_cri_info.rc == 0
+  changed_when: false
+  failed_when: false
+  when:
+    - not k8s_kubelet_conf_stat.stat.exists
+    - not ansible_check_mode
+    - "'cri-dockerd.sock' in (k8s_cri_socket | default(''))"
+  tags: [k8s, worker, join]
+
 - name: Join this node to the cluster
   ansible.builtin.command:
     cmd: "{{ k8s_resolved_join_command }} --cri-socket={{ k8s_cri_socket }}{{ (' --ignore-preflight-errors=' + k8s_kubeadm_ignore_preflight_errors) if (k8s_kubeadm_ignore_preflight_errors | default('') | length > 0) else '' }}"
+  register: k8s_join
+  retries: 5
+  delay: 20
+  until: k8s_join is succeeded
   when:
     - not k8s_kubelet_conf_stat.stat.exists
     - not ansible_check_mode
